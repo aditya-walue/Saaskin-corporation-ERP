@@ -188,6 +188,7 @@ def after_install():
 	create_sales_dashboard()
 	create_operations_dashboard()
 	create_support_dashboard()
+	create_get_in_touch_web_page()
 	create_delivery_confirmation_custom_fields()
 	create_delivery_confirmation_workflow()
 
@@ -204,6 +205,7 @@ def after_migrate():
 	create_sales_dashboard()
 	create_operations_dashboard()
 	create_support_dashboard()
+	create_get_in_touch_web_page()
 	create_delivery_confirmation_custom_fields()
 	create_delivery_confirmation_workflow()
 
@@ -680,3 +682,34 @@ def create_dashboard_from_specs(dashboard_name, card_specs, chart_specs):
 	card_names = [s["label"] for s in card_specs if frappe.db.exists("Number Card", s["label"])]
 	chart_names = [s["label"] for s in chart_specs if frappe.db.exists("Dashboard Chart", s["label"])]
 	create_dashboard(dashboard_name, card_names, chart_names)
+
+
+GET_IN_TOUCH_PAGE_ROUTE = "contact"
+
+GET_IN_TOUCH_PAGE_HTML = """
+<div style="max-width: 720px; margin: 0 auto; padding: 2rem 1rem;">
+	<h1>Get in Touch</h1>
+	<p>Tell us a bit about yourself and we'll get back to you shortly.</p>
+	<iframe
+		src="/get-in-touch"
+		style="width: 100%; min-height: 900px; border: none;"
+		title="Get in Touch form"
+	></iframe>
+</div>
+"""
+
+
+def create_get_in_touch_web_page():
+	if frappe.db.exists("Web Page", {"route": GET_IN_TOUCH_PAGE_ROUTE}):
+		return
+	if not frappe.db.exists("Web Form", "lead-capture-form"):
+		return
+
+	page = frappe.new_doc("Web Page")
+	page.title = "Get in Touch"
+	page.route = GET_IN_TOUCH_PAGE_ROUTE
+	page.published = 1
+	page.show_title = 0
+	page.content_type = "HTML"
+	page.main_section_html = GET_IN_TOUCH_PAGE_HTML
+	page.insert(ignore_permissions=True)
