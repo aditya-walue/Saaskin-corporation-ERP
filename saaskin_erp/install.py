@@ -970,6 +970,7 @@ GET_IN_TOUCH_PAGE_HTML = """
 
 			fetch("/api/method/frappe.website.doctype.web_form.web_form.accept", {
 				method: "POST",
+				credentials: "omit",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ web_form: "get-in-touch", data: JSON.stringify(payload) }),
 			})
