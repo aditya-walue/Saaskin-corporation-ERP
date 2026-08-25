@@ -941,6 +941,10 @@ GET_IN_TOUCH_PAGE_HTML = """
 		});
 
 		var params = new URLSearchParams(window.location.search);
+		var hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+		hashParams.forEach(function (value, key) {
+			if (!params.has(key)) params.set(key, value);
+		});
 		var form = document.getElementById("sk-inquiry-form");
 		var submitBtn = document.getElementById("sk-inquiry-submit");
 		var status = document.getElementById("sk-inquiry-status");
