@@ -164,7 +164,7 @@
   {
    "allow_read_on_all_link_options": 0,
    "fieldname": "landing_page",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "hidden": 1,
    "label": "Landing Page",
    "max_length": 0,

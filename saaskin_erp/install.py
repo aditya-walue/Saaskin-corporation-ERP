@@ -113,7 +113,7 @@ CRM_LEAD_CAPTURE_CUSTOM_FIELDS = {
 		{
 			"fieldname": "landing_page",
 			"label": "Landing Page",
-			"fieldtype": "Data",
+			"fieldtype": "Small Text",
 			"insert_after": "utm_content",
 			"read_only": 1,
 			"no_copy": 1,
@@ -1082,7 +1082,13 @@ INQUIRY_WEB_FORM_FIELDS = [
 	{"fieldname": "utm_medium", "fieldtype": "Data", "label": "UTM Medium", "hidden": 1, "read_only": 1},
 	{"fieldname": "utm_campaign", "fieldtype": "Data", "label": "UTM Campaign", "hidden": 1, "read_only": 1},
 	{"fieldname": "utm_content", "fieldtype": "Data", "label": "UTM Content", "hidden": 1, "read_only": 1},
-	{"fieldname": "landing_page", "fieldtype": "Data", "label": "Landing Page", "hidden": 1, "read_only": 1},
+	{
+		"fieldname": "landing_page",
+		"fieldtype": "Small Text",
+		"label": "Landing Page",
+		"hidden": 1,
+		"read_only": 1,
+	},
 ]
 
 
