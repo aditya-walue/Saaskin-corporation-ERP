@@ -13,8 +13,6 @@ import frappe
 
 DEFAULT_ITEM_GROUP = "Products"
 DEFAULT_UOM = "Nos"
-DEFAULT_CUSTOMER_GROUP = "All Customer Groups"
-DEFAULT_TERRITORY = "All Territories"
 FALLBACK_ITEM_CODE = "General Service"
 
 
@@ -92,12 +90,8 @@ def get_or_create_customer(deal):
 	customer = frappe.new_doc("Customer")
 	customer.customer_name = customer_name
 	customer.customer_type = "Company" if deal.organization_name else "Individual"
-	customer.customer_group = (
-		frappe.db.get_single_value("Selling Settings", "customer_group") or DEFAULT_CUSTOMER_GROUP
-	)
-	customer.territory = deal.territory or (
-		frappe.db.get_single_value("Selling Settings", "territory") or DEFAULT_TERRITORY
-	)
+	customer.customer_group = get_default_customer_group()
+	customer.territory = deal.territory or get_default_territory()
 	customer.insert(ignore_permissions=True)
 	return customer.name
 
@@ -132,6 +126,24 @@ def get_or_create_fallback_item():
 	item.is_stock_item = 0
 	item.insert(ignore_permissions=True)
 	return item.name
+
+
+def get_default_customer_group():
+	# "All Customer Groups" (or whatever Selling Settings might hold) can be a
+	# Group-type node -- ERPNext refuses to assign those to an actual
+	# Customer. Only trust a configured default if it's a real leaf; always
+	# fall back to any non-group Customer Group that exists on the site.
+	configured = frappe.db.get_single_value("Selling Settings", "customer_group")
+	if configured and not frappe.db.get_value("Customer Group", configured, "is_group"):
+		return configured
+	return frappe.db.get_value("Customer Group", {"is_group": 0}, "name")
+
+
+def get_default_territory():
+	configured = frappe.db.get_single_value("Selling Settings", "territory")
+	if configured and not frappe.db.get_value("Territory", configured, "is_group"):
+		return configured
+	return frappe.db.get_value("Territory", {"is_group": 0}, "name")
 
 
 def get_default_company():
