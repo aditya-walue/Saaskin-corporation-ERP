@@ -194,6 +194,7 @@ ASSIGNMENT_DAYS = [
 def after_install():
 	create_crm_sales_order_custom_fields()
 	create_crm_lead_capture_custom_fields()
+	create_web_form_lead_source()
 	create_label_translations()
 	create_lead_assignment_rule()
 	align_deal_pipeline_with_business_flow()
@@ -212,6 +213,7 @@ def after_install():
 def after_migrate():
 	create_crm_sales_order_custom_fields()
 	create_crm_lead_capture_custom_fields()
+	create_web_form_lead_source()
 	create_label_translations()
 	create_lead_assignment_rule()
 	align_deal_pipeline_with_business_flow()
@@ -237,6 +239,19 @@ def create_crm_lead_capture_custom_fields():
 	if "crm" not in frappe.get_installed_apps():
 		return
 	create_custom_fields(CRM_LEAD_CAPTURE_CUSTOM_FIELDS, update=True)
+
+
+def create_web_form_lead_source():
+	# The lead-capture web forms default source to "Web Form" -- fcrm doesn't
+	# ship this as a standard CRM Lead Source on every site, so submissions
+	# fail with a LinkValidationError until this exists.
+	if "crm" not in frappe.get_installed_apps():
+		return
+	if frappe.db.exists("CRM Lead Source", "Web Form"):
+		return
+	frappe.get_doc({"doctype": "CRM Lead Source", "source_name": "Web Form"}).insert(
+		ignore_permissions=True
+	)
 
 
 def create_delivery_confirmation_custom_fields():
