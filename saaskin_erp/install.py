@@ -201,6 +201,7 @@ def after_install():
 	create_sales_dashboard()
 	create_operations_dashboard()
 	create_support_dashboard()
+	create_inquiry_web_form()
 	create_get_in_touch_web_page()
 	create_delivery_confirmation_custom_fields()
 	create_delivery_confirmation_workflow()
@@ -218,6 +219,7 @@ def after_migrate():
 	create_sales_dashboard()
 	create_operations_dashboard()
 	create_support_dashboard()
+	create_inquiry_web_form()
 	create_get_in_touch_web_page()
 	create_delivery_confirmation_custom_fields()
 	create_delivery_confirmation_workflow()
@@ -829,14 +831,82 @@ GET_IN_TOUCH_PAGE_HTML = """
 		></iframe>
 
 		<h2>Send Us a Message</h2>
-		<iframe class="sk-contact__form" src="/get-in-touch" title="Get in touch form"></iframe>
+		<iframe class="sk-contact__form" src="/inquiry" title="Get in touch form"></iframe>
 	</div>
 </div>
 """
 
+INQUIRY_WEB_FORM_ROUTE = "inquiry"
+
+INQUIRY_WEB_FORM_CLIENT_SCRIPT = """frappe.web_form.events.on('after_load', () => {
+	const params = new URLSearchParams(window.location.search);
+	const utm_fields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'];
+
+	utm_fields.forEach((fieldname) => {
+		const value = params.get(fieldname);
+		if (value) {
+			frappe.web_form.set_value(fieldname, value);
+		}
+	});
+
+	frappe.web_form.set_value('landing_page', window.location.href);
+});
+"""
+
+INQUIRY_WEB_FORM_FIELDS = [
+	{"fieldname": "first_name", "fieldtype": "Data", "label": "Name", "reqd": 1},
+	{"fieldname": "email", "fieldtype": "Data", "label": "Email", "options": "Email", "reqd": 1},
+	{"fieldname": "country", "fieldtype": "Link", "label": "Select Country", "options": "Country"},
+	{"fieldname": "mobile_no", "fieldtype": "Data", "label": "Phone Number", "options": "Phone"},
+	{"fieldname": "message", "fieldtype": "Small Text", "label": "Your Message"},
+	{
+		"fieldname": "source",
+		"fieldtype": "Link",
+		"label": "Source",
+		"options": "CRM Lead Source",
+		"default": "Web Form",
+		"hidden": 1,
+		"read_only": 1,
+	},
+	{"fieldname": "utm_source", "fieldtype": "Data", "label": "UTM Source", "hidden": 1, "read_only": 1},
+	{"fieldname": "utm_medium", "fieldtype": "Data", "label": "UTM Medium", "hidden": 1, "read_only": 1},
+	{"fieldname": "utm_campaign", "fieldtype": "Data", "label": "UTM Campaign", "hidden": 1, "read_only": 1},
+	{"fieldname": "utm_content", "fieldtype": "Data", "label": "UTM Content", "hidden": 1, "read_only": 1},
+	{"fieldname": "landing_page", "fieldtype": "Data", "label": "Landing Page", "hidden": 1, "read_only": 1},
+]
+
+
+def create_inquiry_web_form():
+	"""Non-standard (is_standard=0) twin of the code-managed lead-capture-form.
+
+	Standard Web Forms can only be updated by syncing the app's JSON fixture
+	through a migrate -- the desk UI refuses direct edits ("duplicate the Web
+	Form instead"). This one is a plain, freely-editable record instead, so
+	it can be tweaked live without a deploy. Only created once; later edits
+	made in the desk are never overwritten by this function.
+	"""
+	if frappe.db.exists("Web Form", {"route": INQUIRY_WEB_FORM_ROUTE}):
+		return
+
+	form = frappe.new_doc("Web Form")
+	form.title = "Get in Touch"
+	form.route = INQUIRY_WEB_FORM_ROUTE
+	form.doc_type = "CRM Lead"
+	form.is_standard = 0
+	form.published = 1
+	form.login_required = 0
+	form.anonymous = 1
+	form.apply_document_permissions = 0
+	form.introduction_text = "<p>Tell us a bit about yourself and we'll get back to you shortly.</p>"
+	form.success_message = "Thanks for reaching out! Our team will get back to you shortly."
+	form.client_script = INQUIRY_WEB_FORM_CLIENT_SCRIPT
+	for field in INQUIRY_WEB_FORM_FIELDS:
+		form.append("web_form_fields", field)
+	form.insert(ignore_permissions=True)
+
 
 def create_get_in_touch_web_page():
-	if not frappe.db.exists("Web Form", "lead-capture-form"):
+	if not frappe.db.exists("Web Form", {"route": INQUIRY_WEB_FORM_ROUTE}):
 		return
 
 	existing = frappe.db.exists("Web Page", {"route": GET_IN_TOUCH_PAGE_ROUTE})
