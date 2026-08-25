@@ -134,6 +134,7 @@ after_migrate = "saaskin_erp.install.after_migrate"
 
 doc_events = {
 	"CRM Deal": {
+		"validate": "saaskin_erp.crm_sync.sync_expected_deal_value",
 		"on_update": [
 			"saaskin_erp.quote_sync.sync_deal_to_quotation",
 			"saaskin_erp.crm_sync.sync_deal_to_sales_order",

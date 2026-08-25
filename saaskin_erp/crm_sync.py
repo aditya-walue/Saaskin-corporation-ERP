@@ -16,6 +16,22 @@ DEFAULT_UOM = "Nos"
 FALLBACK_ITEM_CODE = "General Service"
 
 
+def sync_expected_deal_value(doc, method=None):
+	"""Fix fcrm's own auto-update: CRMDeal.update_expected_deal_value() only
+	overwrites an already-nonzero expected_deal_value, so it never fires on a
+	deal's first save (expected_deal_value starts at 0, which is falsy). When
+	the site has "Auto Update Expected Deal Value" enabled, this makes it
+	actually track the Products total from the start, not just top it up
+	once something else has already set it.
+	"""
+	if not frappe.db.get_single_value("FCRM Settings", "auto_update_expected_deal_value"):
+		return
+
+	total = doc.net_total or doc.total
+	if total:
+		doc.expected_deal_value = total
+
+
 def sync_deal_to_sales_order(doc, method=None):
 	if not doc.status:
 		return

@@ -121,6 +121,30 @@ class TestCRMSync(IntegrationTestCase):
 		self.assertEqual(item_row.qty, 1)
 		self.assertEqual(item_row.rate, 5000)
 
+	def test_expected_deal_value_fills_from_products_total_on_first_save(self):
+		"""fcrm's own update_expected_deal_value() only overwrites an already
+		-nonzero expected_deal_value, so it never fires on a fresh deal (0 is
+		falsy). Our hook fixes that -- this locks the fix in."""
+		if not frappe.db.get_single_value("FCRM Settings", "auto_update_expected_deal_value"):
+			frappe.db.set_single_value("FCRM Settings", "auto_update_expected_deal_value", 1)
+
+		deal = frappe.get_doc(
+			{
+				"doctype": "CRM Deal",
+				"organization_name": "Expected Value Org",
+				"status": "Prospecting",
+				# total/net_total are normally computed client-side and submitted
+				# alongside the save; simulate that here.
+				"total": 1000,
+				"net_total": 1000,
+			}
+		)
+		self.assertFalse(deal.expected_deal_value)
+		deal.insert(ignore_permissions=True)
+		deal.reload()
+
+		self.assertEqual(deal.expected_deal_value, 1000)
+
 
 def create_test_deal(**kwargs):
 	data = {"doctype": "CRM Deal", "status": "Prospecting"}
