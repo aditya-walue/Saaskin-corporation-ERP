@@ -1,3 +1,5 @@
+import json
+
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
@@ -771,15 +773,80 @@ GET_IN_TOUCH_PAGE_HTML = """
 		margin: 0 0 1rem;
 	}
 
-	.sk-contact__main iframe.sk-contact__form {
+	.sk-inquiry-form__row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+
+	.sk-inquiry-form input,
+	.sk-inquiry-form select,
+	.sk-inquiry-form textarea {
 		width: 100%;
-		min-height: 900px;
-		border: 1px solid #e2e2e2;
+		box-sizing: border-box;
+		font: inherit;
+		font-size: 0.95rem;
+		padding: 0.85rem 1rem;
+		margin-bottom: 1rem;
+		border: 1px solid #d7dbe3;
 		border-radius: 8px;
+		background: #fff;
+		color: #1a1a1a;
+	}
+
+	.sk-inquiry-form input:focus,
+	.sk-inquiry-form select:focus,
+	.sk-inquiry-form textarea:focus {
+		outline: none;
+		border-color: #2952CC;
+	}
+
+	.sk-inquiry-form textarea {
+		resize: vertical;
+		min-height: 140px;
+	}
+
+	.sk-inquiry-form button {
+		width: 100%;
+		font: inherit;
+		font-size: 1rem;
+		font-weight: 600;
+		color: #fff;
+		background: #2952CC;
+		border: none;
+		border-radius: 8px;
+		padding: 1rem;
+		cursor: pointer;
+	}
+
+	.sk-inquiry-form button:hover {
+		background: #23459E;
+	}
+
+	.sk-inquiry-form button:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+
+	.sk-inquiry-form__status {
+		margin: 0.85rem 0 0;
+		font-size: 0.9rem;
+	}
+
+	.sk-inquiry-form__status[data-state="error"] {
+		color: #B3261E;
+	}
+
+	.sk-inquiry-form__status[data-state="success"] {
+		color: #1E7A34;
 	}
 
 	@media (max-width: 780px) {
 		.sk-contact {
+			grid-template-columns: 1fr;
+		}
+
+		.sk-inquiry-form__row {
 			grid-template-columns: 1fr;
 		}
 	}
@@ -831,10 +898,134 @@ GET_IN_TOUCH_PAGE_HTML = """
 		></iframe>
 
 		<h2>Send Us a Message</h2>
-		<iframe class="sk-contact__form" src="/inquiry" title="Get in touch form"></iframe>
+
+		<form class="sk-inquiry-form" id="sk-inquiry-form">
+			<div class="sk-inquiry-form__row">
+				<input type="text" name="first_name" placeholder="Name" required>
+				<input type="email" name="email" placeholder="Email" required>
+			</div>
+			<select name="country" id="sk-inquiry-country">
+				<option value="">Select Country</option>
+			</select>
+			<input type="tel" name="mobile_no" placeholder="Phone Number">
+			<textarea name="message" placeholder="Your Message"></textarea>
+			<button type="submit" id="sk-inquiry-submit">Send Message</button>
+			<p class="sk-inquiry-form__status" id="sk-inquiry-status"></p>
+		</form>
 	</div>
 </div>
+
+<script>
+	(function () {
+		var COUNTRIES = __SAASKIN_COUNTRIES_JSON__;
+		var select = document.getElementById("sk-inquiry-country");
+		COUNTRIES.forEach(function (name) {
+			var opt = document.createElement("option");
+			opt.value = name;
+			opt.textContent = name;
+			select.appendChild(opt);
+		});
+
+		var params = new URLSearchParams(window.location.search);
+		var form = document.getElementById("sk-inquiry-form");
+		var submitBtn = document.getElementById("sk-inquiry-submit");
+		var status = document.getElementById("sk-inquiry-status");
+
+		form.addEventListener("submit", function (e) {
+			e.preventDefault();
+
+			var payload = {
+				doctype: "CRM Lead",
+				web_form_name: "get-in-touch",
+				first_name: form.first_name.value,
+				email: form.email.value,
+				country: form.country.value,
+				mobile_no: form.mobile_no.value,
+				message: form.message.value,
+				source: "Web Form",
+				utm_source: params.get("utm_source") || "",
+				utm_medium: params.get("utm_medium") || "",
+				utm_campaign: params.get("utm_campaign") || "",
+				utm_content: params.get("utm_content") || "",
+				landing_page: window.location.href,
+			};
+
+			submitBtn.disabled = true;
+			status.textContent = "";
+			status.removeAttribute("data-state");
+
+			fetch("/api/method/frappe.website.doctype.web_form.web_form.accept", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ web_form: "get-in-touch", data: JSON.stringify(payload) }),
+			})
+				.then(function (res) {
+					if (!res.ok) throw new Error("request_failed");
+					return res.json();
+				})
+				.then(function () {
+					status.setAttribute("data-state", "success");
+					status.textContent = "Thanks for reaching out! Our team will get back to you shortly.";
+					form.reset();
+				})
+				.catch(function () {
+					status.setAttribute("data-state", "error");
+					status.textContent = "Something went wrong. Please try again or email info@saaskin.com directly.";
+				})
+				.finally(function () {
+					submitBtn.disabled = false;
+				});
+		});
+	})();
+</script>
 """
+
+COUNTRY_NAMES = [
+	"Afghanistan", "Åland Islands", "Albania", "Algeria", "American Samoa", "Andorra", "Angola",
+	"Anguilla", "Antarctica", "Antigua and Barbuda", "Argentina", "Armenia", "Aruba", "Australia",
+	"Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium",
+	"Belize", "Benin", "Bermuda", "Bhutan", "Bolivia, Plurinational State of",
+	"Bonaire, Sint Eustatius and Saba", "Bosnia and Herzegovina", "Botswana", "Bouvet Island", "Brazil",
+	"British Indian Ocean Territory", "Brunei Darussalam", "Bulgaria", "Burkina Faso", "Burundi",
+	"Cambodia", "Cameroon", "Canada", "Cape Verde", "Cayman Islands", "Central African Republic", "Chad",
+	"Chile", "China", "Christmas Island", "Cocos (Keeling) Islands", "Colombia", "Comoros", "Congo",
+	"Congo, The Democratic Republic of the", "Cook Islands", "Costa Rica", "Croatia", "Cuba",
+	"Curaçao", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+	"Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Ethiopia",
+	"Falkland Islands (Malvinas)", "Faroe Islands", "Fiji", "Finland", "France", "French Guiana",
+	"French Polynesia", "French Southern Territories", "Gabon", "Gambia", "Georgia", "Germany", "Ghana",
+	"Gibraltar", "Greece", "Greenland", "Grenada", "Guadeloupe", "Guam", "Guatemala", "Guernsey",
+	"Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Heard Island and McDonald Islands",
+	"Holy See (Vatican City State)", "Honduras", "Hong Kong", "Hungary", "Iceland", "India", "Indonesia",
+	"Iran", "Iraq", "Ireland", "Isle of Man", "Israel", "Italy", "Ivory Coast", "Jamaica", "Japan",
+	"Jersey", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, Democratic Peoples Republic of",
+	"Korea, Republic of", "Kosovo", "Kuwait", "Kyrgyzstan", "Lao Peoples Democratic Republic", "Latvia",
+	"Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Macao",
+	"Macedonia", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands",
+	"Martinique", "Mauritania", "Mauritius", "Mayotte", "Mexico", "Micronesia, Federated States of",
+	"Moldova, Republic of", "Monaco", "Mongolia", "Montenegro", "Montserrat", "Morocco", "Mozambique",
+	"Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Caledonia", "New Zealand", "Nicaragua",
+	"Niger", "Nigeria", "Niue", "Norfolk Island", "Northern Mariana Islands", "Norway", "Oman",
+	"Pakistan", "Palau", "Palestinian Territory, Occupied", "Panama", "Papua New Guinea", "Paraguay",
+	"Peru", "Philippines", "Pitcairn", "Poland", "Portugal", "Puerto Rico", "Qatar", "Réunion",
+	"Romania", "Russian Federation", "Rwanda", "Saint Barthélemy",
+	"Saint Helena, Ascension and Tristan da Cunha", "Saint Kitts and Nevis", "Saint Lucia",
+	"Saint Martin (French part)", "Saint Pierre and Miquelon", "Saint Vincent and the Grenadines",
+	"Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles",
+	"Sierra Leone", "Singapore", "Sint Maarten (Dutch part)", "Slovakia", "Slovenia", "Solomon Islands",
+	"Somalia", "South Africa", "South Georgia and the South Sandwich Islands", "South Sudan", "Spain",
+	"Sri Lanka", "Sudan", "Suriname", "Svalbard and Jan Mayen", "Swaziland", "Sweden", "Switzerland",
+	"Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tokelau", "Tonga",
+	"Trinidad and Tobago", "Tunisia", "Türkiye", "Turkmenistan", "Turks and Caicos Islands",
+	"Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
+	"United States Minor Outlying Islands", "Uruguay", "Uzbekistan", "Vanuatu",
+	"Venezuela, Bolivarian Republic of", "Vietnam", "Virgin Islands, British", "Virgin Islands, U.S.",
+	"Wallis and Futuna", "Western Sahara", "Yemen", "Zambia", "Zimbabwe",
+]
+
+GET_IN_TOUCH_PAGE_HTML = GET_IN_TOUCH_PAGE_HTML.replace(
+	"__SAASKIN_COUNTRIES_JSON__", json.dumps(COUNTRY_NAMES)
+)
 
 INQUIRY_WEB_FORM_ROUTE = "inquiry"
 
