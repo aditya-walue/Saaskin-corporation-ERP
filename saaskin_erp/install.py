@@ -720,6 +720,10 @@ GET_IN_TOUCH_PAGE_ROUTE = "contact"
 
 GET_IN_TOUCH_PAGE_HTML = """
 <style>
+	nav.navbar {
+		display: none !important;
+	}
+
 	.sk-contact {
 		max-width: 1100px;
 		margin: 0 auto;
