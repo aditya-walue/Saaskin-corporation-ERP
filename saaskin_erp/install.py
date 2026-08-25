@@ -720,7 +720,6 @@ GET_IN_TOUCH_PAGE_HTML = """
 		background: #EAF0FE;
 		border-radius: 10px;
 		padding: 2rem 1.75rem;
-		align-self: start;
 	}
 
 	.sk-contact__info h2 {
@@ -901,14 +900,14 @@ GET_IN_TOUCH_PAGE_HTML = """
 
 		<form class="sk-inquiry-form" id="sk-inquiry-form">
 			<div class="sk-inquiry-form__row">
-				<input type="text" name="first_name" placeholder="Name" required>
-				<input type="email" name="email" placeholder="Email" required>
+				<input type="text" name="first_name" placeholder="Name" autocomplete="name" required>
+				<input type="email" name="email" placeholder="Email" autocomplete="email" required>
 			</div>
-			<select name="country" id="sk-inquiry-country">
+			<select name="country" id="sk-inquiry-country" autocomplete="country-name">
 				<option value="">Select Country</option>
 			</select>
-			<input type="tel" name="mobile_no" placeholder="Phone Number">
-			<textarea name="message" placeholder="Your Message"></textarea>
+			<input type="tel" name="mobile_no" placeholder="Phone Number" autocomplete="tel">
+			<textarea name="message" placeholder="Your Message" autocomplete="off"></textarea>
 			<button type="submit" id="sk-inquiry-submit">Send Message</button>
 			<p class="sk-inquiry-form__status" id="sk-inquiry-status"></p>
 		</form>
