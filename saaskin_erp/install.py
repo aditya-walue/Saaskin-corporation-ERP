@@ -125,6 +125,19 @@ CRM_LEAD_CAPTURE_CUSTOM_FIELDS = {
 			"no_copy": 1,
 			"default": "0",
 		},
+		{
+			"fieldname": "country",
+			"label": "Country",
+			"fieldtype": "Link",
+			"options": "Country",
+			"insert_after": "mobile_no",
+		},
+		{
+			"fieldname": "message",
+			"label": "Message",
+			"fieldtype": "Small Text",
+			"insert_after": "country",
+		},
 	],
 }
 
@@ -689,38 +702,135 @@ GET_IN_TOUCH_PAGE_ROUTE = "contact"
 GET_IN_TOUCH_PAGE_HTML = """
 <style>
 	.sk-contact {
-		max-width: 640px;
+		max-width: 1100px;
 		margin: 0 auto;
 		padding: 3rem 1.25rem 4rem;
 		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 		color: #1a1a1a;
+		display: grid;
+		grid-template-columns: 340px 1fr;
+		gap: 2rem;
 	}
 
-	.sk-contact h1 {
-		font-size: 2.25rem;
+	.sk-contact__info {
+		background: #EAF0FE;
+		border-radius: 10px;
+		padding: 2rem 1.75rem;
+		align-self: start;
+	}
+
+	.sk-contact__info h2 {
+		color: #2952CC;
+		font-size: 1.6rem;
+		font-weight: 700;
+		margin: 0 0 1.5rem;
+	}
+
+	.sk-contact__item {
+		display: flex;
+		gap: 0.85rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.sk-contact__item svg {
+		flex: none;
+		width: 20px;
+		height: 20px;
+		margin-top: 2px;
+		color: #2952CC;
+	}
+
+	.sk-contact__item h3 {
+		font-size: 1rem;
 		font-weight: 600;
-		margin: 0 0 0.6rem;
+		color: #2952CC;
+		margin: 0 0 0.3rem;
 	}
 
-	.sk-contact p {
-		font-size: 1.05rem;
-		line-height: 1.5;
-		color: #555;
-		margin: 0 0 2rem;
+	.sk-contact__item p {
+		font-size: 0.95rem;
+		line-height: 1.45;
+		color: #444;
+		margin: 0;
 	}
 
-	.sk-contact iframe {
+	.sk-contact__main iframe.sk-contact__map {
+		width: 100%;
+		height: 260px;
+		border: 1px solid #e2e2e2;
+		border-radius: 8px;
+		margin-bottom: 2rem;
+	}
+
+	.sk-contact__main h2 {
+		color: #2952CC;
+		font-size: 1.6rem;
+		font-weight: 700;
+		margin: 0 0 1rem;
+	}
+
+	.sk-contact__main iframe.sk-contact__form {
 		width: 100%;
 		min-height: 900px;
 		border: 1px solid #e2e2e2;
 		border-radius: 8px;
 	}
+
+	@media (max-width: 780px) {
+		.sk-contact {
+			grid-template-columns: 1fr;
+		}
+	}
 </style>
 
 <div class="sk-contact">
-	<h1>Get in Touch</h1>
-	<p>Tell us a bit about yourself and we'll get back to you shortly.</p>
-	<iframe src="/get-in-touch" title="Get in touch form"></iframe>
+	<div class="sk-contact__info">
+		<h2>Contact Information</h2>
+
+		<div class="sk-contact__item">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+			<div>
+				<h3>Address</h3>
+				<p>275/184, First Floor, Office No: 2, Golden Enclave Periyar EVR Salai, Poonamallee High Rd, Kilpauk, Chennai, India</p>
+			</div>
+		</div>
+
+		<div class="sk-contact__item">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+			<div>
+				<h3>Working Hours</h3>
+				<p>Monday - Saturday<br>9:30 AM - 6:30 PM</p>
+			</div>
+		</div>
+
+		<div class="sk-contact__item">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>
+			<div>
+				<h3>Contact Numbers</h3>
+				<p>+91-9940116677<br>+91-9840819191</p>
+			</div>
+		</div>
+
+		<div class="sk-contact__item">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
+			<div>
+				<h3>Email</h3>
+				<p>info@saaskin.com</p>
+			</div>
+		</div>
+	</div>
+
+	<div class="sk-contact__main">
+		<iframe
+			class="sk-contact__map"
+			src="https://www.google.com/maps?q=Saaskin+Corporation+Private+Limited+Golden+Enclave+Periyar+EVR+Salai+Kilpauk+Chennai&output=embed"
+			title="Saaskin Corporation location"
+			loading="lazy"
+		></iframe>
+
+		<h2>Send Us a Message</h2>
+		<iframe class="sk-contact__form" src="/get-in-touch" title="Get in touch form"></iframe>
+	</div>
 </div>
 """
 
