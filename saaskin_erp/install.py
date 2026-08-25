@@ -871,7 +871,7 @@ GET_IN_TOUCH_PAGE_HTML = """
 	}
 
 	.sk-contact__logo img {
-		height: 44px;
+		height: 80px;
 		width: auto;
 		display: block;
 	}
