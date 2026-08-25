@@ -687,22 +687,51 @@ def create_dashboard_from_specs(dashboard_name, card_specs, chart_specs):
 GET_IN_TOUCH_PAGE_ROUTE = "contact"
 
 GET_IN_TOUCH_PAGE_HTML = """
-<div style="max-width: 720px; margin: 0 auto; padding: 2rem 1rem;">
+<style>
+	.sk-contact {
+		max-width: 640px;
+		margin: 0 auto;
+		padding: 3rem 1.25rem 4rem;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+		color: #1a1a1a;
+	}
+
+	.sk-contact h1 {
+		font-size: 2.25rem;
+		font-weight: 600;
+		margin: 0 0 0.6rem;
+	}
+
+	.sk-contact p {
+		font-size: 1.05rem;
+		line-height: 1.5;
+		color: #555;
+		margin: 0 0 2rem;
+	}
+
+	.sk-contact iframe {
+		width: 100%;
+		min-height: 900px;
+		border: 1px solid #e2e2e2;
+		border-radius: 8px;
+	}
+</style>
+
+<div class="sk-contact">
 	<h1>Get in Touch</h1>
 	<p>Tell us a bit about yourself and we'll get back to you shortly.</p>
-	<iframe
-		src="/get-in-touch"
-		style="width: 100%; min-height: 900px; border: none;"
-		title="Get in Touch form"
-	></iframe>
+	<iframe src="/get-in-touch" title="Get in touch form"></iframe>
 </div>
 """
 
 
 def create_get_in_touch_web_page():
-	if frappe.db.exists("Web Page", {"route": GET_IN_TOUCH_PAGE_ROUTE}):
-		return
 	if not frappe.db.exists("Web Form", "lead-capture-form"):
+		return
+
+	existing = frappe.db.exists("Web Page", {"route": GET_IN_TOUCH_PAGE_ROUTE})
+	if existing:
+		frappe.db.set_value("Web Page", existing, "main_section_html", GET_IN_TOUCH_PAGE_HTML)
 		return
 
 	page = frappe.new_doc("Web Page")
