@@ -864,9 +864,24 @@ GET_IN_TOUCH_PAGE_HTML = """
 			grid-template-columns: 1fr;
 		}
 	}
+
+	.sk-contact__logo {
+		grid-column: 1 / -1;
+		margin-bottom: 0.5rem;
+	}
+
+	.sk-contact__logo img {
+		height: 44px;
+		width: auto;
+		display: block;
+	}
 </style>
 
 <div class="sk-contact">
+	<div class="sk-contact__logo">
+		<img src="/files/saaskin-logo.png" alt="Saaskin Corporation">
+	</div>
+
 	<div class="sk-contact__info">
 		<h2>Contact Information</h2>
 
