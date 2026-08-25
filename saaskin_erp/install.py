@@ -900,6 +900,7 @@ def create_inquiry_web_form():
 	form.introduction_text = "<p>Tell us a bit about yourself and we'll get back to you shortly.</p>"
 	form.success_message = "Thanks for reaching out! Our team will get back to you shortly."
 	form.client_script = INQUIRY_WEB_FORM_CLIENT_SCRIPT
+	form.button_label = "Send Message"
 	for field in INQUIRY_WEB_FORM_FIELDS:
 		form.append("web_form_fields", field)
 	form.insert(ignore_permissions=True)
