@@ -85,8 +85,8 @@ app_license = "mit"
 # Installation
 # ------------
 
-# before_install = "saaskin_erp.install.before_install"
-# after_install = "saaskin_erp.install.after_install"
+after_install = "saaskin_erp.install.after_install"
+after_migrate = "saaskin_erp.install.after_migrate"
 
 # Uninstallation
 # ------------
@@ -132,13 +132,20 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"CRM Deal": {
+		"on_update": [
+			"saaskin_erp.quote_sync.sync_deal_to_quotation",
+			"saaskin_erp.crm_sync.sync_deal_to_sales_order",
+		],
+	},
+	"CRM Lead": {
+		"validate": "saaskin_erp.lead_scoring.score_and_qualify_lead",
+	},
+	"Delivery Note": {
+		"on_update_after_submit": "saaskin_erp.delivery_sync.mark_delivery_confirmed",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
@@ -249,4 +256,11 @@ app_license = "mit"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
+
+# Fixtures
+# ------------
+
+fixtures = [
+	{"dt": "Translation", "filters": [["source_text", "in", ["Convert to Deal"]]]},
+]
 
