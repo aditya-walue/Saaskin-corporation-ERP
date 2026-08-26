@@ -194,6 +194,7 @@ ASSIGNMENT_DAYS = [
 def after_install():
 	create_crm_sales_order_custom_fields()
 	create_crm_lead_capture_custom_fields()
+	create_crm_enrichment_fallback_fields()
 	create_web_form_lead_source()
 	create_label_translations()
 	create_lead_assignment_rule()
@@ -216,6 +217,7 @@ def after_install():
 def after_migrate():
 	create_crm_sales_order_custom_fields()
 	create_crm_lead_capture_custom_fields()
+	create_crm_enrichment_fallback_fields()
 	create_web_form_lead_source()
 	create_label_translations()
 	create_lead_assignment_rule()
@@ -245,6 +247,56 @@ def create_crm_lead_capture_custom_fields():
 	if "crm" not in frappe.get_installed_apps():
 		return
 	create_custom_fields(CRM_LEAD_CAPTURE_CUSTOM_FIELDS, update=True)
+
+
+CRM_ENRICHMENT_FALLBACK_FIELDS = {
+	"CRM Deal": [
+		{
+			"fieldname": "company_description",
+			"label": "Company Description",
+			"fieldtype": "Small Text",
+			"insert_after": "website",
+		},
+		{"fieldname": "linkedin", "label": "LinkedIn", "fieldtype": "Data", "insert_after": "company_description"},
+		{"fieldname": "twitter", "label": "X (Twitter)", "fieldtype": "Data", "insert_after": "linkedin"},
+		{"fieldname": "facebook", "label": "Facebook", "fieldtype": "Data", "insert_after": "twitter"},
+	],
+	"CRM Lead": [
+		{
+			"fieldname": "company_description",
+			"label": "Company Description",
+			"fieldtype": "Small Text",
+			"insert_after": "website",
+		},
+		{"fieldname": "phone", "label": "Phone", "fieldtype": "Data", "insert_after": "company_description"},
+		{"fieldname": "linkedin", "label": "LinkedIn", "fieldtype": "Data", "insert_after": "phone"},
+		{"fieldname": "twitter", "label": "X (Twitter)", "fieldtype": "Data", "insert_after": "linkedin"},
+		{"fieldname": "facebook", "label": "Facebook", "fieldtype": "Data", "insert_after": "twitter"},
+	],
+}
+
+
+def create_crm_enrichment_fallback_fields():
+	# Some crm releases (the one this site's live environment is pinned to,
+	# in particular) don't ship company_description / social link fields on
+	# CRM Deal or CRM Lead at all -- website enrichment (saaskin_erp.enrichment)
+	# has nowhere to put what it finds without them. Add each one as a custom
+	# field, but only where it's actually missing (standard or custom) --
+	# this is a no-op on sites whose crm release already has them standard.
+	if "crm" not in frappe.get_installed_apps():
+		return
+
+	fields_to_add = {}
+	for doctype, fields in CRM_ENRICHMENT_FALLBACK_FIELDS.items():
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		meta = frappe.get_meta(doctype)
+		missing = [f for f in fields if not meta.has_field(f["fieldname"])]
+		if missing:
+			fields_to_add[doctype] = missing
+
+	if fields_to_add:
+		create_custom_fields(fields_to_add, update=True)
 
 
 def create_web_form_lead_source():
