@@ -197,6 +197,7 @@ def after_install():
 	create_web_form_lead_source()
 	create_label_translations()
 	create_lead_assignment_rule()
+	create_qualified_deal_assignment_rule()
 	align_deal_pipeline_with_business_flow()
 	create_purchase_order_approval_workflow()
 	create_quotation_finance_approval_workflow()
@@ -216,6 +217,7 @@ def after_migrate():
 	create_web_form_lead_source()
 	create_label_translations()
 	create_lead_assignment_rule()
+	create_qualified_deal_assignment_rule()
 	align_deal_pipeline_with_business_flow()
 	create_purchase_order_approval_workflow()
 	create_quotation_finance_approval_workflow()
@@ -303,6 +305,41 @@ def create_lead_assignment_rule():
 	rule.assign_condition = "status == 'Qualified' and not lead_owner"
 	rule.rule = "Round Robin"
 	rule.description = "Auto-assign qualified leads to the sales team, round robin."
+	for day in ASSIGNMENT_DAYS:
+		rule.append("assignment_days", {"day": day})
+	for user in sales_users:
+		rule.append("users", {"user": user})
+	rule.insert(ignore_permissions=True)
+
+
+DEAL_ASSIGNMENT_RULE_NAME = "Qualified Deal - Sales Assignment"
+
+
+def create_qualified_deal_assignment_rule():
+	if "crm" not in frappe.get_installed_apps():
+		return
+	if frappe.db.exists("Assignment Rule", DEAL_ASSIGNMENT_RULE_NAME):
+		return
+
+	sales_users = frappe.get_all(
+		"Has Role",
+		filters={"role": "Sales User", "parenttype": "User"},
+		pluck="parent",
+	)
+	sales_users = [
+		user
+		for user in sales_users
+		if user != "Administrator" and frappe.db.get_value("User", user, "enabled")
+	]
+	if not sales_users:
+		return
+
+	rule = frappe.new_doc("Assignment Rule")
+	rule.name = DEAL_ASSIGNMENT_RULE_NAME
+	rule.document_type = "CRM Deal"
+	rule.assign_condition = "status == 'Qualified' and not deal_owner"
+	rule.rule = "Round Robin"
+	rule.description = "Auto-assign qualified deals to the sales team, round robin."
 	for day in ASSIGNMENT_DAYS:
 		rule.append("assignment_days", {"day": day})
 	for user in sales_users:
