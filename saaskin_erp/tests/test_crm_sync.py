@@ -121,6 +121,72 @@ class TestCRMSync(IntegrationTestCase):
 		self.assertEqual(item_row.qty, 1)
 		self.assertEqual(item_row.rate, 5000)
 
+	def test_won_deal_links_primary_contact_to_customer(self):
+		contact = frappe.get_doc(
+			{
+				"doctype": "Contact",
+				"first_name": "Sneha",
+				"last_name": "Iyer",
+				"email_ids": [{"email_id": "sneha@contact-sync-test.example", "is_primary": 1}],
+			}
+		).insert(ignore_permissions=True)
+
+		deal = create_test_deal(organization_name="Contact Sync Org")
+		deal.append("contacts", {"contact": contact.name, "is_primary": 1})
+		deal.save()
+
+		deal.status = "Closed Won"
+		deal.save()
+		deal.reload()
+
+		customer = frappe.get_doc("Customer", deal.custom_customer)
+		self.assertEqual(customer.customer_primary_contact, contact.name)
+		contact.reload()
+		self.assertTrue(
+			any(link.link_doctype == "Customer" and link.link_name == customer.name for link in contact.links)
+		)
+
+	def test_won_deal_does_not_overwrite_existing_primary_contact(self):
+		existing_contact = frappe.get_doc(
+			{
+				"doctype": "Contact",
+				"first_name": "Existing",
+				"last_name": "Primary",
+				"email_ids": [{"email_id": "existing@contact-sync-test.example", "is_primary": 1}],
+			}
+		).insert(ignore_permissions=True)
+
+		customer = frappe.get_doc(
+			{
+				"doctype": "Customer",
+				"customer_name": "Preexisting Primary Contact Org",
+				"customer_type": "Company",
+				"customer_primary_contact": existing_contact.name,
+			}
+		).insert(ignore_permissions=True)
+
+		new_contact = frappe.get_doc(
+			{
+				"doctype": "Contact",
+				"first_name": "New",
+				"last_name": "Deal Contact",
+				"email_ids": [{"email_id": "new@contact-sync-test.example", "is_primary": 1}],
+			}
+		).insert(ignore_permissions=True)
+
+		deal = create_test_deal(organization_name="Preexisting Primary Contact Org")
+		deal.append("contacts", {"contact": new_contact.name, "is_primary": 1})
+		deal.save()
+
+		deal.status = "Closed Won"
+		deal.save()
+		deal.reload()
+
+		self.assertEqual(deal.custom_customer, customer.name)
+		self.assertEqual(
+			frappe.db.get_value("Customer", customer.name, "customer_primary_contact"), existing_contact.name
+		)
+
 	def test_expected_deal_value_fills_from_products_total_on_first_save(self):
 		"""fcrm's own update_expected_deal_value() only overwrites an already
 		-nonzero expected_deal_value, so it never fires on a fresh deal (0 is

@@ -195,6 +195,7 @@ def after_install():
 	create_crm_sales_order_custom_fields()
 	create_crm_lead_capture_custom_fields()
 	create_crm_enrichment_fallback_fields()
+	disable_erpnext_crm_settings_customer_sync()
 	create_web_form_lead_source()
 	create_label_translations()
 	create_lead_assignment_rule()
@@ -218,6 +219,7 @@ def after_migrate():
 	create_crm_sales_order_custom_fields()
 	create_crm_lead_capture_custom_fields()
 	create_crm_enrichment_fallback_fields()
+	disable_erpnext_crm_settings_customer_sync()
 	create_web_form_lead_source()
 	create_label_translations()
 	create_lead_assignment_rule()
@@ -299,6 +301,25 @@ def create_crm_enrichment_fallback_fields():
 
 	if fields_to_add:
 		create_custom_fields(fields_to_add, update=True)
+
+
+def disable_erpnext_crm_settings_customer_sync():
+	# fcrm ships its own "ERPNext CRM Settings" > create_customer_on_status_change
+	# toggle that independently creates a Customer + Contact when a Deal's
+	# status matches its configured deal_status -- redundant with, and worse
+	# than, our own saaskin_erp.crm_sync.sync_deal_to_sales_order (which also
+	# creates the Sales Order and properly links/primaries the Contact). Left
+	# enabled, both fire on the same status change and it builds a second,
+	# inferior Contact (whole name dumped into first_name, no phone) instead
+	# of reusing the deal's real one. Only touch it if it's still on --
+	# leaves it alone if a site operator has deliberately re-enabled it.
+	if "crm" not in frappe.get_installed_apps():
+		return
+	if not frappe.db.exists("DocType", "ERPNext CRM Settings"):
+		return
+	if not frappe.db.get_single_value("ERPNext CRM Settings", "create_customer_on_status_change"):
+		return
+	frappe.db.set_single_value("ERPNext CRM Settings", "create_customer_on_status_change", 0)
 
 
 def create_web_form_lead_source():

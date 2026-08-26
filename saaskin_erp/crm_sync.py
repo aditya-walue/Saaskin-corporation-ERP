@@ -93,6 +93,8 @@ def create_sales_order_from_deal(deal):
 	deal.db_set("custom_sales_order", sales_order.name, update_modified=False)
 	deal.db_set("custom_customer", customer, update_modified=False)
 
+	link_deal_contact_to_customer(deal, customer)
+
 	return sales_order
 
 
@@ -110,6 +112,43 @@ def get_or_create_customer(deal):
 	customer.territory = deal.territory or get_default_territory()
 	customer.insert(ignore_permissions=True)
 	return customer.name
+
+
+def link_deal_contact_to_customer(deal, customer):
+	"""Point the Customer's Primary Contact at the deal's own contact, and
+	link that Contact record to the Customer via Dynamic Link -- neither
+	happens on its own. fcrm's separate "ERPNext CRM Settings" integration
+	(create_customer_on_status_change) can independently build its own,
+	worse Contact (whole name dumped into first_name, no phone) in parallel
+	with this; that toggle is disabled by install.py for that reason.
+	"""
+	if frappe.db.get_value("Customer", customer, "customer_primary_contact"):
+		return
+
+	contact_name = get_deal_contact(deal)
+	if not contact_name:
+		return
+
+	contact = frappe.get_doc("Contact", contact_name)
+	already_linked = any(
+		link.link_doctype == "Customer" and link.link_name == customer for link in contact.links
+	)
+	if not already_linked:
+		contact.append("links", {"link_doctype": "Customer", "link_name": customer})
+		contact.save(ignore_permissions=True)
+
+	frappe.db.set_value("Customer", customer, "customer_primary_contact", contact_name)
+
+
+def get_deal_contact(deal):
+	primary_row = next((row for row in deal.contacts or [] if row.is_primary), None)
+	if primary_row and primary_row.contact:
+		return primary_row.contact
+
+	if deal.contacts:
+		return deal.contacts[0].contact
+
+	return deal.contact or None
 
 
 def get_or_create_item(row):
