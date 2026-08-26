@@ -45,6 +45,11 @@ def _enrich(doctype, docname, organization_field):
 	doc = frappe.get_doc(doctype, docname)
 	doc.check_permission("write")
 
+	# Field sets drift across crm app releases (e.g. company_description /
+	# social links don't exist on older pinned versions) -- only ever touch
+	# fields that actually exist on this site's schema for this doctype.
+	valid_fields = {f.fieldname for f in doc.meta.fields}
+
 	website = (doc.website or "").strip()
 	if not website:
 		frappe.throw(frappe._("Set a Website on this record before enriching."))
@@ -66,7 +71,7 @@ def _enrich(doctype, docname, organization_field):
 
 	values = {}
 
-	if not doc.get(organization_field):
+	if organization_field in valid_fields and not doc.get(organization_field):
 		title_match = TITLE_RE.search(html)
 		if title_match:
 			title = re.sub(r"\s+", " ", title_match.group(1)).strip()
@@ -74,14 +79,14 @@ def _enrich(doctype, docname, organization_field):
 			if title:
 				values[organization_field] = title
 
-	if not doc.company_description:
+	if "company_description" in valid_fields and not doc.get("company_description"):
 		desc_match = META_DESC_RE.search(html)
 		if desc_match:
 			desc = desc_match.group(1).strip()
 			if desc:
 				values["company_description"] = desc
 
-	if not doc.email:
+	if "email" in valid_fields and not doc.get("email"):
 		mailto_matches = MAILTO_RE.findall(html)
 		if mailto_matches:
 			values["email"] = mailto_matches[0].strip()
@@ -90,7 +95,7 @@ def _enrich(doctype, docname, organization_field):
 			if emails:
 				values["email"] = emails[0]
 
-	if not doc.phone:
+	if "phone" in valid_fields and not doc.get("phone"):
 		# Only trust explicit tel: links -- free-text digit scanning on a page
 		# throws up too many false positives (dates, version numbers, IDs).
 		tel_matches = TEL_RE.findall(html)
@@ -98,7 +103,7 @@ def _enrich(doctype, docname, organization_field):
 			values["phone"] = tel_matches[0].strip()
 
 	for fieldname, pattern in SOCIAL_PATTERNS.items():
-		if doc.get(fieldname):
+		if fieldname not in valid_fields or doc.get(fieldname):
 			continue
 		match = pattern.search(html)
 		if match:
