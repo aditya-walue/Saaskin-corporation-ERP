@@ -582,7 +582,20 @@ def create_deal_form_script():
 DEAL_ENRICH_FORM_SCRIPT_NAME = "Saaskin - Enrich Deal from Website"
 
 DEAL_ENRICH_FORM_SCRIPT = """class CRMDeal {
-	onLoad() {
+	async onLoad() {
+		if (this.doc.__newDocument) return
+		try {
+			// fcrm's own native Enrich (crm.domain_enrichment) only exists on
+			// some site builds -- skip ours where that module is present so
+			// we don't show a duplicate button next to the native one.
+			const count = await call('frappe.client.get_count', {
+				doctype: 'Module Def',
+				filters: { module_name: 'Domain Enrichment' },
+			})
+			if (count) return
+		} catch (e) {
+			// If the check itself fails, fall through and show our own button.
+		}
 		this.setActions()
 	}
 	setActions() {
@@ -657,7 +670,20 @@ def create_deal_enrich_form_script():
 LEAD_ENRICH_FORM_SCRIPT_NAME = "Saaskin - Enrich Lead from Website"
 
 LEAD_ENRICH_FORM_SCRIPT = """class CRMLead {
-	onLoad() {
+	async onLoad() {
+		if (this.doc.__newDocument) return
+		try {
+			// fcrm's own native Enrich (crm.domain_enrichment) only exists on
+			// some site builds -- skip ours where that module is present so
+			// we don't show a duplicate button next to the native one.
+			const count = await call('frappe.client.get_count', {
+				doctype: 'Module Def',
+				filters: { module_name: 'Domain Enrichment' },
+			})
+			if (count) return
+		} catch (e) {
+			// If the check itself fails, fall through and show our own button.
+		}
 		this.setActions()
 	}
 	setActions() {
