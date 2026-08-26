@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from saaskin_erp.install import DEAL_ENRICH_FORM_SCRIPT_NAME
+from saaskin_erp.install import DEAL_ENRICH_FORM_SCRIPT_NAME, LEAD_ENRICH_FORM_SCRIPT_NAME
 
 SAMPLE_HTML = """
 <html><head>
@@ -94,3 +94,75 @@ class TestDealEnrichment(IntegrationTestCase):
 		deal.reload()
 
 		self.assertEqual(deal.organization_name, "Keep This Name")
+
+
+class TestLeadEnrichment(IntegrationTestCase):
+	def tearDown(self) -> None:
+		frappe.db.rollback()
+
+	def test_enrich_form_script_registered_for_crm_lead(self):
+		self.assertTrue(frappe.db.exists("CRM Form Script", LEAD_ENRICH_FORM_SCRIPT_NAME))
+		dt, view, enabled = frappe.db.get_value(
+			"CRM Form Script", LEAD_ENRICH_FORM_SCRIPT_NAME, ["dt", "view", "enabled"]
+		)
+		self.assertEqual(dt, "CRM Lead")
+		self.assertEqual(view, "Form")
+		self.assertEqual(enabled, 1)
+
+	def test_enrich_lead_requires_website(self):
+		from saaskin_erp.enrichment import enrich_lead
+
+		lead = frappe.get_doc(
+			{"doctype": "CRM Lead", "first_name": "No Website Lead", "status": "New"}
+		).insert(ignore_permissions=True)
+
+		with self.assertRaises(frappe.ValidationError):
+			enrich_lead(lead.name)
+
+	@patch("saaskin_erp.enrichment.requests.get")
+	def test_enrich_lead_fills_empty_fields_from_website(self, mock_get):
+		from saaskin_erp.enrichment import enrich_lead
+
+		mock_get.return_value = mocked_response()
+
+		lead = frappe.get_doc(
+			{
+				"doctype": "CRM Lead",
+				"first_name": "Website Lead",
+				"status": "New",
+				"organization": "",
+				"website": "https://sample-org.test",
+			}
+		).insert(ignore_permissions=True)
+
+		result = enrich_lead(lead.name)
+		lead.reload()
+
+		self.assertEqual(
+			set(result["filled_fields"]),
+			{"organization", "company_description", "email", "phone", "linkedin"},
+		)
+		self.assertEqual(lead.organization, "Sample Org")
+		self.assertEqual(lead.email, "hello@sample-org.test")
+		self.assertEqual(lead.phone, "+15551234567")
+
+	@patch("saaskin_erp.enrichment.requests.get")
+	def test_enrich_lead_does_not_overwrite_existing_values(self, mock_get):
+		from saaskin_erp.enrichment import enrich_lead
+
+		mock_get.return_value = mocked_response()
+
+		lead = frappe.get_doc(
+			{
+				"doctype": "CRM Lead",
+				"first_name": "Website Lead",
+				"status": "New",
+				"organization": "Keep This Org",
+				"website": "https://sample-org.test",
+			}
+		).insert(ignore_permissions=True)
+
+		enrich_lead(lead.name)
+		lead.reload()
+
+		self.assertEqual(lead.organization, "Keep This Org")

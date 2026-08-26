@@ -1,10 +1,11 @@
-"""Self-contained "Enrich from website" for CRM Deal.
+"""Self-contained "Enrich from website" for CRM Deal and CRM Lead.
 
 fcrm ships this as `crm.domain_enrichment` (background crawl + realtime
 socket events), but that module only exists on fcrm's develop branch --
-it's not in the site's pinned release (see DEAL_ENRICH_FORM_SCRIPT in
-install.py). This is a lighter synchronous replacement: fetch the deal's
-website homepage once and fill in whichever of a few fields are still empty.
+it's not in the site's pinned release (see DEAL_ENRICH_FORM_SCRIPT and
+LEAD_ENRICH_FORM_SCRIPT in install.py). This is a lighter synchronous
+replacement: fetch the record's website homepage once and fill in whichever
+of a few fields are still empty.
 """
 
 import re
@@ -32,7 +33,16 @@ IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp")
 
 @frappe.whitelist()
 def enrich_deal(deal):
-	doc = frappe.get_doc("CRM Deal", deal)
+	return _enrich("CRM Deal", deal, organization_field="organization_name")
+
+
+@frappe.whitelist()
+def enrich_lead(lead):
+	return _enrich("CRM Lead", lead, organization_field="organization")
+
+
+def _enrich(doctype, docname, organization_field):
+	doc = frappe.get_doc(doctype, docname)
 	doc.check_permission("write")
 
 	website = (doc.website or "").strip()
@@ -56,13 +66,13 @@ def enrich_deal(deal):
 
 	values = {}
 
-	if not doc.organization_name:
+	if not doc.get(organization_field):
 		title_match = TITLE_RE.search(html)
 		if title_match:
 			title = re.sub(r"\s+", " ", title_match.group(1)).strip()
 			title = re.split(r"[|\-–]", title)[0].strip()
 			if title:
-				values["organization_name"] = title
+				values[organization_field] = title
 
 	if not doc.company_description:
 		desc_match = META_DESC_RE.search(html)

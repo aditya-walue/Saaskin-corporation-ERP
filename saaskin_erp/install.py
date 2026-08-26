@@ -203,6 +203,7 @@ def after_install():
 	create_quotation_finance_approval_workflow()
 	create_deal_form_script()
 	create_deal_enrich_form_script()
+	create_lead_enrich_form_script()
 	create_sales_dashboard()
 	create_operations_dashboard()
 	create_support_dashboard()
@@ -224,6 +225,7 @@ def after_migrate():
 	create_quotation_finance_approval_workflow()
 	create_deal_form_script()
 	create_deal_enrich_form_script()
+	create_lead_enrich_form_script()
 	create_sales_dashboard()
 	create_operations_dashboard()
 	create_support_dashboard()
@@ -648,6 +650,81 @@ def create_deal_enrich_form_script():
 			"enabled": 1,
 			"is_standard": 0,
 			"script": DEAL_ENRICH_FORM_SCRIPT,
+		}
+	).insert(ignore_permissions=True)
+
+
+LEAD_ENRICH_FORM_SCRIPT_NAME = "Saaskin - Enrich Lead from Website"
+
+LEAD_ENRICH_FORM_SCRIPT = """class CRMLead {
+	onLoad() {
+		this.setActions()
+	}
+	setActions() {
+		this.actions = (this.actions || []).filter(
+			(a) => a.label !== __('Enrich') && a.label !== __('Enriching...')
+		)
+		this.actions.push({
+			label: this._enriching ? __('Enriching...') : __('Enrich'),
+			icon: 'zap',
+			onClick: () => this.enrich(),
+		})
+	}
+	async enrich() {
+		if (this._enriching) return
+		if (!this.doc.website) {
+			toast.warning(__('Set a Website on this record before enriching.'))
+			return
+		}
+		this._enriching = true
+		this.setActions()
+		try {
+			const result = await call('saaskin_erp.enrichment.enrich_lead', {
+				lead: this.doc.name,
+			})
+			const values = (result && result.values) || {}
+			const filled = (result && result.filled_fields) || []
+			const notes = (result && result.notes) || []
+			for (const key in values) {
+				this.doc[key] = values[key]
+			}
+			if (filled.length) {
+				toast.success(__('Enriched. Filled: {0}', [filled.join(', ')]))
+			} else if (notes.length) {
+				toast.warning(notes[0])
+			} else {
+				toast.success(__('Enrichment complete.'))
+			}
+		} catch (e) {
+			toast.error((e.messages && e.messages[0]) || __('Could not enrich from website.'))
+		} finally {
+			this._enriching = false
+			this.setActions()
+		}
+	}
+}"""
+
+
+def create_lead_enrich_form_script():
+	if "crm" not in frappe.get_installed_apps():
+		return
+	if frappe.db.exists("CRM Form Script", LEAD_ENRICH_FORM_SCRIPT_NAME):
+		frappe.db.set_value(
+			"CRM Form Script",
+			LEAD_ENRICH_FORM_SCRIPT_NAME,
+			{"script": LEAD_ENRICH_FORM_SCRIPT, "enabled": 1},
+		)
+		return
+
+	frappe.get_doc(
+		{
+			"doctype": "CRM Form Script",
+			"name": LEAD_ENRICH_FORM_SCRIPT_NAME,
+			"dt": "CRM Lead",
+			"view": "Form",
+			"enabled": 1,
+			"is_standard": 0,
+			"script": LEAD_ENRICH_FORM_SCRIPT,
 		}
 	).insert(ignore_permissions=True)
 
