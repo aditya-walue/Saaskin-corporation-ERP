@@ -202,6 +202,7 @@ def after_install():
 	create_purchase_order_approval_workflow()
 	create_quotation_finance_approval_workflow()
 	create_deal_form_script()
+	create_deal_enrich_form_script()
 	create_sales_dashboard()
 	create_operations_dashboard()
 	create_support_dashboard()
@@ -222,6 +223,7 @@ def after_migrate():
 	create_purchase_order_approval_workflow()
 	create_quotation_finance_approval_workflow()
 	create_deal_form_script()
+	create_deal_enrich_form_script()
 	create_sales_dashboard()
 	create_operations_dashboard()
 	create_support_dashboard()
@@ -571,6 +573,81 @@ def create_deal_form_script():
 			"enabled": 1,
 			"is_standard": 0,
 			"script": DEAL_FORM_SCRIPT,
+		}
+	).insert(ignore_permissions=True)
+
+
+DEAL_ENRICH_FORM_SCRIPT_NAME = "Saaskin - Enrich Deal from Website"
+
+DEAL_ENRICH_FORM_SCRIPT = """class CRMDeal {
+	onLoad() {
+		this.setActions()
+	}
+	setActions() {
+		this.actions = (this.actions || []).filter(
+			(a) => a.label !== __('Enrich') && a.label !== __('Enriching...')
+		)
+		this.actions.push({
+			label: this._enriching ? __('Enriching...') : __('Enrich'),
+			icon: 'zap',
+			onClick: () => this.enrich(),
+		})
+	}
+	async enrich() {
+		if (this._enriching) return
+		if (!this.doc.website) {
+			toast.warning(__('Set a Website on this record before enriching.'))
+			return
+		}
+		this._enriching = true
+		this.setActions()
+		try {
+			const result = await call('saaskin_erp.enrichment.enrich_deal', {
+				deal: this.doc.name,
+			})
+			const values = (result && result.values) || {}
+			const filled = (result && result.filled_fields) || []
+			const notes = (result && result.notes) || []
+			for (const key in values) {
+				this.doc[key] = values[key]
+			}
+			if (filled.length) {
+				toast.success(__('Enriched. Filled: {0}', [filled.join(', ')]))
+			} else if (notes.length) {
+				toast.warning(notes[0])
+			} else {
+				toast.success(__('Enrichment complete.'))
+			}
+		} catch (e) {
+			toast.error((e.messages && e.messages[0]) || __('Could not enrich from website.'))
+		} finally {
+			this._enriching = false
+			this.setActions()
+		}
+	}
+}"""
+
+
+def create_deal_enrich_form_script():
+	if "crm" not in frappe.get_installed_apps():
+		return
+	if frappe.db.exists("CRM Form Script", DEAL_ENRICH_FORM_SCRIPT_NAME):
+		frappe.db.set_value(
+			"CRM Form Script",
+			DEAL_ENRICH_FORM_SCRIPT_NAME,
+			{"script": DEAL_ENRICH_FORM_SCRIPT, "enabled": 1},
+		)
+		return
+
+	frappe.get_doc(
+		{
+			"doctype": "CRM Form Script",
+			"name": DEAL_ENRICH_FORM_SCRIPT_NAME,
+			"dt": "CRM Deal",
+			"view": "Form",
+			"enabled": 1,
+			"is_standard": 0,
+			"script": DEAL_ENRICH_FORM_SCRIPT,
 		}
 	).insert(ignore_permissions=True)
 
