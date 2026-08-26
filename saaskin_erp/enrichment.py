@@ -8,6 +8,7 @@ replacement: fetch the record's website homepage once and fill in whichever
 of a few fields are still empty.
 """
 
+import json
 import re
 
 import frappe
@@ -29,6 +30,59 @@ SOCIAL_PATTERNS = {
 	"facebook": re.compile(r'href=["\'](https?://(?:www\.)?facebook\.com/[^"\']+)', re.IGNORECASE),
 }
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp")
+
+JSONLD_RE = re.compile(
+	r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.IGNORECASE | re.DOTALL
+)
+ADDRESS_TAG_RE = re.compile(r"<address[^>]*>(.*?)</address>", re.IGNORECASE | re.DOTALL)
+
+
+def _find_postal_address(node):
+	if isinstance(node, dict):
+		if node.get("@type") == "PostalAddress":
+			parts = [
+				node.get("streetAddress"),
+				node.get("addressLocality"),
+				node.get("addressRegion"),
+				node.get("postalCode"),
+				node.get("addressCountry"),
+			]
+			parts = [str(p).strip() for p in parts if p]
+			if parts:
+				return ", ".join(parts)
+		for value in node.values():
+			found = _find_postal_address(value)
+			if found:
+				return found
+	elif isinstance(node, list):
+		for item in node:
+			found = _find_postal_address(item)
+			if found:
+				return found
+	return None
+
+
+def _extract_address(html):
+	# Prefer structured data (schema.org PostalAddress in a JSON-LD block) --
+	# far less noisy than scraping visible text. Falls back to a semantic
+	# <address> tag if no structured data is present.
+	for match in JSONLD_RE.finditer(html):
+		try:
+			data = json.loads(match.group(1).strip())
+		except (ValueError, TypeError):
+			continue
+		address = _find_postal_address(data)
+		if address:
+			return address
+
+	tag_match = ADDRESS_TAG_RE.search(html)
+	if tag_match:
+		text = re.sub(r"<[^>]+>", " ", tag_match.group(1))
+		text = re.sub(r"\s+", " ", text).strip()
+		if text:
+			return text
+
+	return None
 
 
 @frappe.whitelist()
@@ -108,6 +162,11 @@ def _enrich(doctype, docname, organization_field):
 		match = pattern.search(html)
 		if match:
 			values[fieldname] = match.group(1)
+
+	if "address" in valid_fields and not doc.get("address"):
+		address = _extract_address(html)
+		if address:
+			values["address"] = address
 
 	if not values:
 		return {

@@ -9,6 +9,11 @@ SAMPLE_HTML = """
 <html><head>
 <title>Sample Org - Home</title>
 <meta name="description" content="A sample company for testing.">
+<script type="application/ld+json">
+{"@type": "Organization", "address": {"@type": "PostalAddress",
+"streetAddress": "123 Sample St", "addressLocality": "Sampletown",
+"addressRegion": "CA", "postalCode": "90210", "addressCountry": "US"}}
+</script>
 </head><body>
 <a href="mailto:hello@sample-org.test">Email us</a>
 <a href="tel:+15551234567">Call us</a>
@@ -16,10 +21,18 @@ SAMPLE_HTML = """
 </body></html>
 """
 
+SAMPLE_ADDRESS = "123 Sample St, Sampletown, CA, 90210, US"
 
-def mocked_response():
+SAMPLE_HTML_ADDRESS_TAG_ONLY = """
+<html><head><title>Sample Org - Home</title></head><body>
+<address>456 Fallback Ave, Tagsville, TX 75001</address>
+</body></html>
+"""
+
+
+def mocked_response(html=SAMPLE_HTML):
 	response = Mock()
-	response.text = SAMPLE_HTML
+	response.text = html
 	response.raise_for_status = Mock()
 	return response
 
@@ -67,13 +80,14 @@ class TestDealEnrichment(IntegrationTestCase):
 
 		self.assertEqual(
 			set(result["filled_fields"]),
-			{"organization_name", "company_description", "email", "phone", "linkedin"},
+			{"organization_name", "company_description", "email", "phone", "linkedin", "address"},
 		)
 		self.assertEqual(deal.organization_name, "Sample Org")
 		self.assertEqual(deal.company_description, "A sample company for testing.")
 		self.assertEqual(deal.email, "hello@sample-org.test")
 		self.assertEqual(deal.phone, "+15551234567")
 		self.assertEqual(deal.linkedin, "https://www.linkedin.com/company/sample-org")
+		self.assertEqual(deal.address, SAMPLE_ADDRESS)
 
 	@patch("saaskin_erp.enrichment.requests.get")
 	def test_enrich_deal_does_not_overwrite_existing_values(self, mock_get):
@@ -94,6 +108,27 @@ class TestDealEnrichment(IntegrationTestCase):
 		deal.reload()
 
 		self.assertEqual(deal.organization_name, "Keep This Name")
+
+	@patch("saaskin_erp.enrichment.requests.get")
+	def test_enrich_deal_falls_back_to_address_tag(self, mock_get):
+		from saaskin_erp.enrichment import enrich_deal
+
+		mock_get.return_value = mocked_response(SAMPLE_HTML_ADDRESS_TAG_ONLY)
+
+		deal = frappe.get_doc(
+			{
+				"doctype": "CRM Deal",
+				"organization_name": "Address Tag Org",
+				"status": "Prospecting",
+				"website": "https://sample-org.test",
+			}
+		).insert(ignore_permissions=True)
+
+		result = enrich_deal(deal.name)
+		deal.reload()
+
+		self.assertIn("address", result["filled_fields"])
+		self.assertEqual(deal.address, "456 Fallback Ave, Tagsville, TX 75001")
 
 
 class TestLeadEnrichment(IntegrationTestCase):
@@ -140,11 +175,12 @@ class TestLeadEnrichment(IntegrationTestCase):
 
 		self.assertEqual(
 			set(result["filled_fields"]),
-			{"organization", "company_description", "email", "phone", "linkedin"},
+			{"organization", "company_description", "email", "phone", "linkedin", "address"},
 		)
 		self.assertEqual(lead.organization, "Sample Org")
 		self.assertEqual(lead.email, "hello@sample-org.test")
 		self.assertEqual(lead.phone, "+15551234567")
+		self.assertEqual(lead.address, SAMPLE_ADDRESS)
 
 	@patch("saaskin_erp.enrichment.requests.get")
 	def test_enrich_lead_does_not_overwrite_existing_values(self, mock_get):

@@ -260,6 +260,7 @@ CRM_ENRICHMENT_FALLBACK_FIELDS = {
 		{"fieldname": "linkedin", "label": "LinkedIn", "fieldtype": "Data", "insert_after": "company_description"},
 		{"fieldname": "twitter", "label": "X (Twitter)", "fieldtype": "Data", "insert_after": "linkedin"},
 		{"fieldname": "facebook", "label": "Facebook", "fieldtype": "Data", "insert_after": "twitter"},
+		{"fieldname": "address", "label": "Address", "fieldtype": "Small Text", "insert_after": "facebook"},
 	],
 	"CRM Lead": [
 		{
@@ -272,6 +273,7 @@ CRM_ENRICHMENT_FALLBACK_FIELDS = {
 		{"fieldname": "linkedin", "label": "LinkedIn", "fieldtype": "Data", "insert_after": "phone"},
 		{"fieldname": "twitter", "label": "X (Twitter)", "fieldtype": "Data", "insert_after": "linkedin"},
 		{"fieldname": "facebook", "label": "Facebook", "fieldtype": "Data", "insert_after": "twitter"},
+		{"fieldname": "address", "label": "Address", "fieldtype": "Small Text", "insert_after": "facebook"},
 	],
 }
 
