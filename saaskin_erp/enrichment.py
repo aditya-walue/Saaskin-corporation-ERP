@@ -35,6 +35,15 @@ JSONLD_RE = re.compile(
 	r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.IGNORECASE | re.DOTALL
 )
 ADDRESS_TAG_RE = re.compile(r"<address[^>]*>(.*?)</address>", re.IGNORECASE | re.DOTALL)
+P_TAG_RE = re.compile(r"<p[^>]*>(.*?)</p>", re.IGNORECASE | re.DOTALL)
+ADDRESS_KEYWORD_RE = re.compile(
+	r"\b(road|street|st\.|avenue|ave\.|floor|building|layout|nagar|block|sector|"
+	r"lane|drive|blvd|boulevard|highway|hwy|suite|ste\.)\b",
+	re.IGNORECASE,
+)
+POSTAL_CODE_RE = re.compile(r"\b\d{5,6}(?:-\d{4})?\b")
+
+PLAYWRIGHT_TIMEOUT_MS = 15000
 
 
 def _find_postal_address(node):
@@ -82,7 +91,53 @@ def _extract_address(html):
 		if text:
 			return text
 
+	# Last resort: plenty of sites just put the address in a plain <p> with no
+	# semantic markup at all -- only trust one that both looks like an address
+	# (a postal code) and reads like one (a road/street/floor/etc keyword), to
+	# avoid grabbing an unrelated paragraph that happens to contain a number.
+	for inner in P_TAG_RE.findall(html):
+		text = re.sub(r"<[^>]+>", " ", inner)
+		text = re.sub(r"\s+", " ", text).strip()
+		if not text or len(text) > 200:
+			continue
+		if POSTAL_CODE_RE.search(text) and ADDRESS_KEYWORD_RE.search(text):
+			return text
+
 	return None
+
+
+def _fetch_rendered_html(url):
+	# Best-effort: sites built on Wix/Squarespace/React etc. render their real
+	# content client-side -- a plain HTTP fetch only ever sees the empty page
+	# shell. Falls back to a plain request (the caller) if Playwright or its
+	# browser isn't installed, so this never blocks enrichment from working.
+	try:
+		from playwright.sync_api import sync_playwright
+	except ImportError:
+		return None
+
+	try:
+		with sync_playwright() as p:
+			browser = p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])
+			try:
+				page = browser.new_page(user_agent=USER_AGENT)
+				page.goto(url, timeout=PLAYWRIGHT_TIMEOUT_MS, wait_until="domcontentloaded")
+				page.wait_for_timeout(2000)
+				return page.content()
+			finally:
+				browser.close()
+	except Exception:
+		return None
+
+
+def _fetch_html(url):
+	rendered_html = _fetch_rendered_html(url)
+	if rendered_html is not None:
+		return rendered_html
+
+	response = requests.get(url, timeout=REQUEST_TIMEOUT, headers={"User-Agent": USER_AGENT})
+	response.raise_for_status()
+	return response.text
 
 
 @frappe.whitelist()
@@ -111,8 +166,7 @@ def _enrich(doctype, docname, organization_field):
 	url = website if website.startswith(("http://", "https://")) else f"https://{website}"
 
 	try:
-		response = requests.get(url, timeout=REQUEST_TIMEOUT, headers={"User-Agent": USER_AGENT})
-		response.raise_for_status()
+		html = _fetch_html(url)
 	except requests.RequestException as e:
 		return {
 			"filled_fields": [],
@@ -120,7 +174,6 @@ def _enrich(doctype, docname, organization_field):
 			"values": {},
 		}
 
-	html = response.text
 	text = re.sub(r"<[^>]+>", " ", html)
 
 	values = {}

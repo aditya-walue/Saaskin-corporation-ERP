@@ -29,6 +29,18 @@ SAMPLE_HTML_ADDRESS_TAG_ONLY = """
 </body></html>
 """
 
+SAMPLE_HTML_PLAIN_TEXT_ADDRESS = """
+<html><head><title>Sample Org - Home</title></head><body>
+<div><p>789 Plain Street, Faketown - 60007</p></div>
+</body></html>
+"""
+
+SAMPLE_HTML_JS_RENDERED = """
+<html><head><title>Sample Org - Home</title></head><body>
+<a href="https://www.linkedin.com/company/sample-org">LinkedIn</a>
+</body></html>
+"""
+
 
 def mocked_response(html=SAMPLE_HTML):
 	response = Mock()
@@ -38,6 +50,15 @@ def mocked_response(html=SAMPLE_HTML):
 
 
 class TestDealEnrichment(IntegrationTestCase):
+	def setUp(self) -> None:
+		# Force the requests.get fallback path deterministically -- without
+		# this, a real Playwright/Chromium install (present in dev envs) would
+		# actually try to render the fake test domain before falling back,
+		# which is slow and depends on how DNS failure behaves in the sandbox.
+		patcher = patch("saaskin_erp.enrichment._fetch_rendered_html", return_value=None)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+
 	def tearDown(self) -> None:
 		frappe.db.rollback()
 
@@ -130,8 +151,59 @@ class TestDealEnrichment(IntegrationTestCase):
 		self.assertIn("address", result["filled_fields"])
 		self.assertEqual(deal.address, "456 Fallback Ave, Tagsville, TX 75001")
 
+	@patch("saaskin_erp.enrichment.requests.get")
+	def test_enrich_deal_falls_back_to_plain_text_address(self, mock_get):
+		from saaskin_erp.enrichment import enrich_deal
+
+		mock_get.return_value = mocked_response(SAMPLE_HTML_PLAIN_TEXT_ADDRESS)
+
+		deal = frappe.get_doc(
+			{
+				"doctype": "CRM Deal",
+				"organization_name": "Plain Text Org",
+				"status": "Prospecting",
+				"website": "https://sample-org.test",
+			}
+		).insert(ignore_permissions=True)
+
+		result = enrich_deal(deal.name)
+		deal.reload()
+
+		self.assertIn("address", result["filled_fields"])
+		self.assertEqual(deal.address, "789 Plain Street, Faketown - 60007")
+
+	@patch("saaskin_erp.enrichment._fetch_rendered_html")
+	def test_enrich_deal_uses_rendered_html_when_available(self, mock_render):
+		from saaskin_erp.enrichment import enrich_deal
+
+		mock_render.return_value = SAMPLE_HTML_JS_RENDERED
+
+		deal = frappe.get_doc(
+			{
+				"doctype": "CRM Deal",
+				"organization_name": "JS Rendered Org",
+				"status": "Prospecting",
+				"website": "https://sample-org.test",
+			}
+		).insert(ignore_permissions=True)
+
+		result = enrich_deal(deal.name)
+		deal.reload()
+
+		self.assertEqual(deal.linkedin, "https://www.linkedin.com/company/sample-org")
+		self.assertIn("linkedin", result["filled_fields"])
+
 
 class TestLeadEnrichment(IntegrationTestCase):
+	def setUp(self) -> None:
+		# Force the requests.get fallback path deterministically -- without
+		# this, a real Playwright/Chromium install (present in dev envs) would
+		# actually try to render the fake test domain before falling back,
+		# which is slow and depends on how DNS failure behaves in the sandbox.
+		patcher = patch("saaskin_erp.enrichment._fetch_rendered_html", return_value=None)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+
 	def tearDown(self) -> None:
 		frappe.db.rollback()
 
