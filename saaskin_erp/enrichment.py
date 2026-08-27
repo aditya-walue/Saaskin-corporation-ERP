@@ -122,22 +122,36 @@ def _create_address_doc(raw_text, title):
 		return None
 
 	parts = [p.strip() for p in raw_text.split(",") if p.strip()]
-	city = None
-	for part in parts:
-		if country.lower() in part.lower():
-			continue
-		if NAME_LIKE_RE.fullmatch(part) and part.lower() != country.lower():
-			city = part
+	name_like_parts = [
+		p for p in parts if NAME_LIKE_RE.fullmatch(p) and p.lower() != country.lower()
+	]
+	city = name_like_parts[-1] if name_like_parts else None
 	if not city and len(parts) >= 2:
 		city = parts[-2]
+	# Some sites (e.g. India, via the india_compliance app) require a state --
+	# best-effort guess from the second-to-last name-like segment, distinct
+	# from whichever one was already used as the city.
+	state = next((p for p in reversed(name_like_parts) if p != city), None)
 
 	address = frappe.new_doc("Address")
 	address.address_title = title
 	address.address_type = "Billing"
 	address.address_line1 = raw_text[:140]
 	address.city = (city or title)[:140]
+	if state:
+		address.state = state[:140]
 	address.country = country
-	address.insert(ignore_permissions=True)
+	try:
+		address.insert(ignore_permissions=True)
+	except Exception:
+		# Address validation varies by site (e.g. india_compliance requires
+		# state) -- never let a scraped address we can't fully satisfy break
+		# the rest of enrichment.
+		frappe.log_error(
+			title="saaskin_erp.enrichment: could not create Address",
+			message=frappe.get_traceback(),
+		)
+		return None
 	return address.name
 
 

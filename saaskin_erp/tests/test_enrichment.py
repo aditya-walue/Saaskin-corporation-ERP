@@ -198,6 +198,38 @@ class TestDealEnrichment(IntegrationTestCase):
 		self.assertEqual(deal.linkedin, "https://www.linkedin.com/company/sample-org")
 		self.assertIn("linkedin", result["filled_fields"])
 
+	@patch("saaskin_erp.enrichment.requests.get")
+	def test_enrich_deal_survives_address_creation_failure(self, mock_get):
+		# Address validation varies by site (e.g. india_compliance requires
+		# state, not installed here, but the failure mode must still be
+		# handled defensively) -- a broken address must never take down the
+		# rest of enrichment with it.
+		from saaskin_erp.enrichment import enrich_deal
+
+		mock_get.return_value = mocked_response()
+
+		deal = frappe.get_doc(
+			{
+				"doctype": "CRM Deal",
+				"organization_name": "",
+				"status": "Prospecting",
+				"website": "https://sample-org.test",
+			}
+		).insert(ignore_permissions=True)
+
+		with patch("saaskin_erp.enrichment.frappe.new_doc") as mock_address_doc:
+			address_stub = frappe.new_doc("Address")
+			address_stub.insert = Mock(side_effect=frappe.ValidationError("State is a required field"))
+			mock_address_doc.return_value = address_stub
+
+			result = enrich_deal(deal.name)
+
+		deal.reload()
+
+		self.assertNotIn("address", result["filled_fields"])
+		self.assertEqual(deal.organization_name, "Sample Org")
+		self.assertEqual(deal.email, "hello@sample-org.test")
+
 
 class TestLeadEnrichment(IntegrationTestCase):
 	def setUp(self) -> None:
