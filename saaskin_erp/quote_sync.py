@@ -19,6 +19,8 @@ from saaskin_erp.crm_sync import (
 	get_or_create_customer,
 	get_or_create_fallback_item,
 	get_or_create_item,
+	link_deal_address_to_customer,
+	link_deal_contact_to_customer,
 )
 
 PROPOSAL_STATUS = "Proposal"
@@ -77,5 +79,8 @@ def create_quotation_from_deal(deal):
 
 	deal.db_set("custom_quotation", quotation.name, update_modified=False)
 	deal.db_set("custom_customer", customer, update_modified=False)
+
+	link_deal_contact_to_customer(deal, customer)
+	link_deal_address_to_customer(deal, customer)
 
 	return quotation
