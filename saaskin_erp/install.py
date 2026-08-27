@@ -602,31 +602,20 @@ def create_approval_workflow(workflow_name, document_type, states, transitions):
 
 DEAL_FORM_SCRIPT_NAME = "Saaskin - Deal Order Actions"
 
-DEAL_FORM_SCRIPT = """function setupForm({ doc, updateField }) {
+DEAL_FORM_SCRIPT = """function setupForm({ doc }) {
 	let actions = []
 
-	const PIPELINE_STATUSES = [
-		['Prospecting', '⚪'],
-		['Contacted', '🟠'],
-		['Qualified', '🔵'],
-		['Proposal', '🟣'],
-		['Negotiation', '🟡'],
-		['Closed Won', '🟢'],
-		['Closed Lost', '🔴'],
-	]
-
-	actions.push({
-		buttonLabel: __('Convert'),
-		group: __('Convert'),
-		items: PIPELINE_STATUSES.map(([status, dot]) => ({
-			label: __(status),
-			icon: dot,
+	// The native status pill (top right) already changes/converts the deal's
+	// status -- a separate "Convert" button duplicated the same action.
+	if (doc.custom_quotation) {
+		actions.push({
+			label: __('View Quotation'),
+			icon: 'file-text',
 			onClick: () => {
-				if (status === doc.status) return
-				updateField('status', status)
+				window.open('/app/quotation/' + doc.custom_quotation, '_blank')
 			},
-		})),
-	})
+		})
+	}
 
 	return { actions }
 }"""
