@@ -187,6 +187,68 @@ class TestCRMSync(IntegrationTestCase):
 			frappe.db.get_value("Customer", customer.name, "customer_primary_contact"), existing_contact.name
 		)
 
+	def test_won_deal_reuses_contacts_linked_address(self):
+		contact = frappe.get_doc(
+			{
+				"doctype": "Contact",
+				"first_name": "Address",
+				"last_name": "Owner",
+				"email_ids": [{"email_id": "address.owner@contact-sync-test.example", "is_primary": 1}],
+			}
+		).insert(ignore_permissions=True)
+
+		address = frappe.get_doc(
+			{
+				"doctype": "Address",
+				"address_title": "Contact Linked Address",
+				"address_type": "Billing",
+				"address_line1": "1 Contact Address Way",
+				"city": "Testville",
+				"country": "India",
+				"links": [{"link_doctype": "Contact", "link_name": contact.name}],
+			}
+		).insert(ignore_permissions=True)
+
+		deal = create_test_deal(organization_name="Address Reuse Org")
+		deal.append("contacts", {"contact": contact.name, "is_primary": 1})
+		deal.save()
+
+		deal.status = "Closed Won"
+		deal.save()
+		deal.reload()
+
+		customer = frappe.get_doc("Customer", deal.custom_customer)
+		self.assertEqual(customer.customer_primary_address, address.name)
+		address.reload()
+		self.assertTrue(
+			any(link.link_doctype == "Customer" and link.link_name == customer.name for link in address.links)
+		)
+
+	def test_won_deal_builds_address_from_enriched_deal_text(self):
+		deal = create_test_deal(organization_name="Enriched Address Org")
+		deal.address = "1 Enriched Street, Testopolis - 60007, Illinois, United States"
+		deal.save()
+
+		deal.status = "Closed Won"
+		deal.save()
+		deal.reload()
+
+		customer = frappe.get_doc("Customer", deal.custom_customer)
+		self.assertTrue(customer.customer_primary_address)
+
+		address = frappe.get_doc("Address", customer.customer_primary_address)
+		self.assertEqual(address.country, "United States")
+		self.assertIn("1 Enriched Street", address.address_line1)
+
+	def test_won_deal_without_address_data_does_not_create_address(self):
+		deal = create_test_deal(organization_name="No Address Data Org")
+		deal.status = "Closed Won"
+		deal.save()
+		deal.reload()
+
+		customer = frappe.get_doc("Customer", deal.custom_customer)
+		self.assertFalse(customer.customer_primary_address)
+
 	def test_expected_deal_value_fills_from_products_total_on_first_save(self):
 		"""fcrm's own update_expected_deal_value() only overwrites an already
 		-nonzero expected_deal_value, so it never fires on a fresh deal (0 is

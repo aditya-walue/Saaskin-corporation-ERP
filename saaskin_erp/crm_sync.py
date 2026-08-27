@@ -9,6 +9,8 @@ separate Proposal -> Quotation step). Left as Draft: submitting/approving
 is a manual step from here.
 """
 
+import re
+
 import frappe
 
 DEFAULT_ITEM_GROUP = "Products"
@@ -94,6 +96,7 @@ def create_sales_order_from_deal(deal):
 	deal.db_set("custom_customer", customer, update_modified=False)
 
 	link_deal_contact_to_customer(deal, customer)
+	link_deal_address_to_customer(deal, customer)
 
 	return sales_order
 
@@ -138,6 +141,86 @@ def link_deal_contact_to_customer(deal, customer):
 		contact.save(ignore_permissions=True)
 
 	frappe.db.set_value("Customer", customer, "customer_primary_contact", contact_name)
+
+
+def link_deal_address_to_customer(deal, customer):
+	"""Point the Customer's Primary Address at something -- a Won deal's
+	Customer otherwise ends up with no Address at all (fcrm never creates
+	one for a Lead/Deal's Contact), which blocks anything downstream that
+	needs one (e.g. Shipment's "Delivery to" address auto-fetches from the
+	Customer and has nothing to pull). Prefers an Address already linked to
+	the deal's own Contact; falls back to building one from the deal's own
+	`address` field (saaskin_erp.enrichment's scraped, unstructured text) if
+	no Contact-linked Address exists. Does nothing if neither is available --
+	never invents an address from nothing.
+	"""
+	if frappe.db.get_value("Customer", customer, "customer_primary_address"):
+		return
+
+	address_name = get_contact_linked_address(deal)
+	if not address_name:
+		address_name = create_address_from_deal_text(deal, customer)
+	if not address_name:
+		return
+
+	address = frappe.get_doc("Address", address_name)
+	already_linked = any(
+		link.link_doctype == "Customer" and link.link_name == customer for link in address.links
+	)
+	if not already_linked:
+		address.append("links", {"link_doctype": "Customer", "link_name": customer})
+		address.save(ignore_permissions=True)
+
+	frappe.db.set_value("Customer", customer, "customer_primary_address", address_name)
+
+
+def get_contact_linked_address(deal):
+	contact_name = get_deal_contact(deal)
+	if not contact_name:
+		return None
+	return frappe.db.get_value(
+		"Dynamic Link",
+		{"parenttype": "Address", "link_doctype": "Contact", "link_name": contact_name},
+		"parent",
+	)
+
+
+def create_address_from_deal_text(deal, customer):
+	# saaskin_erp.enrichment writes a single unstructured line (e.g. from a
+	# site's JSON-LD PostalAddress or a scraped <address> tag) -- Address
+	# requires address_line1/city/country broken out, so this is a best
+	# effort split, not a real parse.
+	raw = (deal.get("address") or "").strip()
+	if not raw:
+		return None
+
+	from saaskin_erp.install import COUNTRY_NAMES
+
+	country = next((c for c in COUNTRY_NAMES if c.lower() in raw.lower()), None)
+	if not country:
+		country = frappe.get_cached_value("Company", get_default_company(), "country")
+	if not country:
+		return None
+
+	parts = [p.strip() for p in raw.split(",") if p.strip()]
+	city = None
+	for part in parts:
+		if country and country.lower() in part.lower():
+			continue
+		if re.fullmatch(r"[A-Za-z .'-]+", part) and part.lower() != country.lower():
+			city = part
+	if not city and len(parts) >= 2:
+		city = parts[-2]
+
+	address = frappe.new_doc("Address")
+	address.address_title = customer
+	address.address_type = "Billing"
+	address.address_line1 = raw[:140]
+	address.city = (city or customer)[:140]
+	address.country = country
+	address.append("links", {"link_doctype": "Customer", "link_name": customer})
+	address.insert(ignore_permissions=True)
+	return address.name
 
 
 def get_deal_contact(deal):
