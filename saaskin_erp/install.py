@@ -744,6 +744,7 @@ DEAL_FORM_SCRIPT = """function setupForm({ doc, updateField }) {
 		window.__saaskinHideDealStatusPill.observe(document.body, {
 			childList: true,
 			subtree: true,
+			characterData: true,
 		})
 	}
 
@@ -796,6 +797,7 @@ LEAD_FORM_SCRIPT = """function setupForm({ doc }) {
 		window.__saaskinHideLeadStatusPill.observe(document.body, {
 			childList: true,
 			subtree: true,
+			characterData: true,
 		})
 	}
 
