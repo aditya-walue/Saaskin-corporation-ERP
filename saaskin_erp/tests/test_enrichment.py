@@ -12,7 +12,7 @@ SAMPLE_HTML = """
 <script type="application/ld+json">
 {"@type": "Organization", "address": {"@type": "PostalAddress",
 "streetAddress": "123 Sample St", "addressLocality": "Sampletown",
-"addressRegion": "CA", "postalCode": "90210", "addressCountry": "US"}}
+"addressRegion": "CA", "postalCode": "90210", "addressCountry": "United States"}}
 </script>
 </head><body>
 <a href="mailto:hello@sample-org.test">Email us</a>
@@ -21,17 +21,15 @@ SAMPLE_HTML = """
 </body></html>
 """
 
-SAMPLE_ADDRESS = "123 Sample St, Sampletown, CA, 90210, US"
-
 SAMPLE_HTML_ADDRESS_TAG_ONLY = """
 <html><head><title>Sample Org - Home</title></head><body>
-<address>456 Fallback Ave, Tagsville, TX 75001</address>
+<address>456 Fallback Ave, Tagsville, TX 75001, United States</address>
 </body></html>
 """
 
 SAMPLE_HTML_PLAIN_TEXT_ADDRESS = """
 <html><head><title>Sample Org - Home</title></head><body>
-<div><p>789 Plain Street, Faketown - 60007</p></div>
+<div><p>789 Plain Street, Faketown - 60007, United States</p></div>
 </body></html>
 """
 
@@ -108,7 +106,10 @@ class TestDealEnrichment(IntegrationTestCase):
 		self.assertEqual(deal.email, "hello@sample-org.test")
 		self.assertEqual(deal.phone, "+15551234567")
 		self.assertEqual(deal.linkedin, "https://www.linkedin.com/company/sample-org")
-		self.assertEqual(deal.address, SAMPLE_ADDRESS)
+		self.assertTrue(deal.address)
+		address = frappe.get_doc("Address", deal.address)
+		self.assertIn("123 Sample St", address.address_line1)
+		self.assertEqual(address.country, "United States")
 
 	@patch("saaskin_erp.enrichment.requests.get")
 	def test_enrich_deal_does_not_overwrite_existing_values(self, mock_get):
@@ -149,7 +150,9 @@ class TestDealEnrichment(IntegrationTestCase):
 		deal.reload()
 
 		self.assertIn("address", result["filled_fields"])
-		self.assertEqual(deal.address, "456 Fallback Ave, Tagsville, TX 75001")
+		address = frappe.get_doc("Address", deal.address)
+		self.assertIn("456 Fallback Ave", address.address_line1)
+		self.assertEqual(address.country, "United States")
 
 	@patch("saaskin_erp.enrichment.requests.get")
 	def test_enrich_deal_falls_back_to_plain_text_address(self, mock_get):
@@ -170,7 +173,9 @@ class TestDealEnrichment(IntegrationTestCase):
 		deal.reload()
 
 		self.assertIn("address", result["filled_fields"])
-		self.assertEqual(deal.address, "789 Plain Street, Faketown - 60007")
+		address = frappe.get_doc("Address", deal.address)
+		self.assertIn("789 Plain Street", address.address_line1)
+		self.assertEqual(address.country, "United States")
 
 	@patch("saaskin_erp.enrichment._fetch_rendered_html")
 	def test_enrich_deal_uses_rendered_html_when_available(self, mock_render):
@@ -252,7 +257,10 @@ class TestLeadEnrichment(IntegrationTestCase):
 		self.assertEqual(lead.organization, "Sample Org")
 		self.assertEqual(lead.email, "hello@sample-org.test")
 		self.assertEqual(lead.phone, "+15551234567")
-		self.assertEqual(lead.address, SAMPLE_ADDRESS)
+		self.assertTrue(lead.address)
+		address = frappe.get_doc("Address", lead.address)
+		self.assertIn("123 Sample St", address.address_line1)
+		self.assertEqual(address.country, "United States")
 
 	@patch("saaskin_erp.enrichment.requests.get")
 	def test_enrich_lead_does_not_overwrite_existing_values(self, mock_get):

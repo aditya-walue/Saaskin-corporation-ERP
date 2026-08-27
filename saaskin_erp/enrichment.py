@@ -42,6 +42,7 @@ ADDRESS_KEYWORD_RE = re.compile(
 	re.IGNORECASE,
 )
 POSTAL_CODE_RE = re.compile(r"\b\d{5,6}(?:-\d{4})?\b")
+NAME_LIKE_RE = re.compile(r"[A-Za-z .'-]+")
 
 PLAYWRIGHT_TIMEOUT_MS = 15000
 
@@ -104,6 +105,40 @@ def _extract_address(html):
 			return text
 
 	return None
+
+
+def _create_address_doc(raw_text, title):
+	# The scraped text is one unstructured line (from a JSON-LD PostalAddress
+	# or a scraped tag/paragraph) -- Address requires address_line1/city/
+	# country broken out, so this is a best-effort split, not a real parse.
+	from saaskin_erp.install import COUNTRY_NAMES
+
+	country = next((c for c in COUNTRY_NAMES if c.lower() in raw_text.lower()), None)
+	if not country:
+		from saaskin_erp.crm_sync import get_default_company
+
+		country = frappe.get_cached_value("Company", get_default_company(), "country")
+	if not country:
+		return None
+
+	parts = [p.strip() for p in raw_text.split(",") if p.strip()]
+	city = None
+	for part in parts:
+		if country.lower() in part.lower():
+			continue
+		if NAME_LIKE_RE.fullmatch(part) and part.lower() != country.lower():
+			city = part
+	if not city and len(parts) >= 2:
+		city = parts[-2]
+
+	address = frappe.new_doc("Address")
+	address.address_title = title
+	address.address_type = "Billing"
+	address.address_line1 = raw_text[:140]
+	address.city = (city or title)[:140]
+	address.country = country
+	address.insert(ignore_permissions=True)
+	return address.name
 
 
 def _fetch_rendered_html(url):
@@ -217,9 +252,12 @@ def _enrich(doctype, docname, organization_field):
 			values[fieldname] = match.group(1)
 
 	if "address" in valid_fields and not doc.get("address"):
-		address = _extract_address(html)
-		if address:
-			values["address"] = address
+		raw_address = _extract_address(html)
+		if raw_address:
+			title = doc.get(organization_field) or doc.name
+			address_name = _create_address_doc(raw_address, title)
+			if address_name:
+				values["address"] = address_name
 
 	if not values:
 		return {

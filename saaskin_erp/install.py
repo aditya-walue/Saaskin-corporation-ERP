@@ -266,7 +266,13 @@ CRM_ENRICHMENT_FALLBACK_FIELDS = {
 		{"fieldname": "linkedin", "label": "LinkedIn", "fieldtype": "Data", "insert_after": "company_description"},
 		{"fieldname": "twitter", "label": "X (Twitter)", "fieldtype": "Data", "insert_after": "linkedin"},
 		{"fieldname": "facebook", "label": "Facebook", "fieldtype": "Data", "insert_after": "twitter"},
-		{"fieldname": "address", "label": "Address", "fieldtype": "Small Text", "insert_after": "facebook"},
+		{
+			"fieldname": "address",
+			"label": "Address",
+			"fieldtype": "Link",
+			"options": "Address",
+			"insert_after": "facebook",
+		},
 	],
 	"CRM Lead": [
 		{
@@ -279,7 +285,13 @@ CRM_ENRICHMENT_FALLBACK_FIELDS = {
 		{"fieldname": "linkedin", "label": "LinkedIn", "fieldtype": "Data", "insert_after": "phone"},
 		{"fieldname": "twitter", "label": "X (Twitter)", "fieldtype": "Data", "insert_after": "linkedin"},
 		{"fieldname": "facebook", "label": "Facebook", "fieldtype": "Data", "insert_after": "twitter"},
-		{"fieldname": "address", "label": "Address", "fieldtype": "Small Text", "insert_after": "facebook"},
+		{
+			"fieldname": "address",
+			"label": "Address",
+			"fieldtype": "Link",
+			"options": "Address",
+			"insert_after": "facebook",
+		},
 	],
 }
 
@@ -305,6 +317,29 @@ def create_crm_enrichment_fallback_fields():
 
 	if fields_to_add:
 		create_custom_fields(fields_to_add, update=True)
+
+	_fix_address_field_type()
+
+
+def _fix_address_field_type():
+	# address started out as Small Text (raw scraped text); enrichment.py
+	# now creates a real Address record and links to it instead, so the
+	# field itself needs to be a Link -- on any site where it was already
+	# created under the old type, create_custom_fields() above won't have
+	# touched it (it only adds fields that are missing entirely). Frappe
+	# refuses to change a Custom Field's fieldtype in place, so drop and
+	# recreate it -- any existing free-text value in that column is stale
+	# under the new type anyway (it was never a valid Address name).
+	for doctype, fields in CRM_ENRICHMENT_FALLBACK_FIELDS.items():
+		name = f"{doctype}-address"
+		if not frappe.db.exists("Custom Field", name):
+			continue
+		fieldtype, options = frappe.db.get_value("Custom Field", name, ["fieldtype", "options"])
+		if fieldtype == "Link" and options == "Address":
+			continue
+		frappe.delete_doc("Custom Field", name, ignore_permissions=True, force=True)
+		field_spec = next(f for f in fields if f["fieldname"] == "address")
+		create_custom_fields({doctype: [field_spec]}, update=True)
 
 
 def add_address_field_to_crm_layouts():

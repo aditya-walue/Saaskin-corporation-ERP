@@ -224,9 +224,20 @@ class TestCRMSync(IntegrationTestCase):
 			any(link.link_doctype == "Customer" and link.link_name == customer.name for link in address.links)
 		)
 
-	def test_won_deal_builds_address_from_enriched_deal_text(self):
+	def test_won_deal_reuses_deals_own_address_link(self):
+		address = frappe.get_doc(
+			{
+				"doctype": "Address",
+				"address_title": "Deal Own Address",
+				"address_type": "Billing",
+				"address_line1": "1 Enriched Street",
+				"city": "Testopolis",
+				"country": "United States",
+			}
+		).insert(ignore_permissions=True)
+
 		deal = create_test_deal(organization_name="Enriched Address Org")
-		deal.address = "1 Enriched Street, Testopolis - 60007, Illinois, United States"
+		deal.address = address.name
 		deal.save()
 
 		deal.status = "Closed Won"
@@ -234,11 +245,11 @@ class TestCRMSync(IntegrationTestCase):
 		deal.reload()
 
 		customer = frappe.get_doc("Customer", deal.custom_customer)
-		self.assertTrue(customer.customer_primary_address)
-
-		address = frappe.get_doc("Address", customer.customer_primary_address)
-		self.assertEqual(address.country, "United States")
-		self.assertIn("1 Enriched Street", address.address_line1)
+		self.assertEqual(customer.customer_primary_address, address.name)
+		address.reload()
+		self.assertTrue(
+			any(link.link_doctype == "Customer" and link.link_name == customer.name for link in address.links)
+		)
 
 	def test_won_deal_without_address_data_does_not_create_address(self):
 		deal = create_test_deal(organization_name="No Address Data Org")
