@@ -689,31 +689,8 @@ def create_deal_form_script():
 
 LEAD_FORM_SCRIPT_NAME = "Saaskin - Lead Status Actions"
 
-LEAD_FORM_SCRIPT = """function setupForm({ doc, updateField }) {
+LEAD_FORM_SCRIPT = """function setupForm({ doc }) {
 	let actions = []
-
-	const LEAD_STATUSES = [
-		['New', '⚪'],
-		['Contacted', '🟠'],
-		['Nurture', '🔵'],
-		['Qualified', '🟢'],
-		['Converted', '🔷'],
-		['Unqualified', '🔴'],
-		['Junk', '🟣'],
-	]
-
-	actions.push({
-		buttonLabel: __('Convert'),
-		group: __('Convert'),
-		items: LEAD_STATUSES.map(([status, dot]) => ({
-			label: __(status),
-			icon: dot,
-			onClick: () => {
-				if (status === doc.status) return
-				updateField('status', status)
-			},
-		})),
-	})
 
 	// Hide the native status pill (colored dot + status label + chevron,
 	// top right) -- hardcoded in fcrm's Lead.vue, not something a Form
