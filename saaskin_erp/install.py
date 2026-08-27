@@ -638,6 +638,27 @@ DEAL_FORM_SCRIPT = """function setupForm({ doc, updateField }) {
 		})
 	}
 
+	// Hide the native status pill (colored dot + status label + chevron,
+	// top right) -- hardcoded in fcrm's Deal.vue, not something a Form
+	// Script action can suppress. Convert (above) is meant to be the single
+	// status-change control instead. Re-checks on every DOM change since
+	// the pill's own label re-renders on each status change; skips dropdown
+	// menu popovers so it never touches the Convert menu's own items.
+	if (!window.__saaskinHideDealStatusPill) {
+		window.__saaskinHideDealStatusPill = new MutationObserver(() => {
+			document.querySelectorAll('button').forEach((btn) => {
+				if (btn.closest('[role="menu"], [role="listbox"]')) return
+				if (btn.textContent.trim() === doc.status) {
+					btn.style.display = 'none'
+				}
+			})
+		})
+		window.__saaskinHideDealStatusPill.observe(document.body, {
+			childList: true,
+			subtree: true,
+		})
+	}
+
 	return { actions }
 }"""
 
