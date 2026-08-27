@@ -195,6 +195,7 @@ def after_install():
 	create_crm_sales_order_custom_fields()
 	create_crm_lead_capture_custom_fields()
 	create_crm_enrichment_fallback_fields()
+	add_address_field_to_crm_layouts()
 	disable_erpnext_crm_settings_customer_sync()
 	create_web_form_lead_source()
 	create_label_translations()
@@ -220,6 +221,7 @@ def after_migrate():
 	create_crm_sales_order_custom_fields()
 	create_crm_lead_capture_custom_fields()
 	create_crm_enrichment_fallback_fields()
+	add_address_field_to_crm_layouts()
 	disable_erpnext_crm_settings_customer_sync()
 	create_web_form_lead_source()
 	create_label_translations()
@@ -303,6 +305,45 @@ def create_crm_enrichment_fallback_fields():
 
 	if fields_to_add:
 		create_custom_fields(fields_to_add, update=True)
+
+
+def add_address_field_to_crm_layouts():
+	# CRM Fields Layout controls what actually renders on the Data tab --
+	# separate from the doctype's own field list. The other enrichment
+	# fallback fields (linkedin/twitter/facebook/company_description) ended
+	# up in these layouts already (added via the Data tab's own edit UI at
+	# some point); "address" never did, so it existed on the doctype but was
+	# invisible in the CRM frontend. Insert it right after "facebook" in
+	# whichever column already holds that field; no-op if already present
+	# or if that anchor column can't be found.
+	if "crm" not in frappe.get_installed_apps():
+		return
+	if not frappe.db.exists("DocType", "CRM Fields Layout"):
+		return
+
+	for layout_name in ("CRM Lead-Data Fields", "CRM Deal-Data Fields"):
+		if not frappe.db.exists("CRM Fields Layout", layout_name):
+			continue
+
+		doc = frappe.get_doc("CRM Fields Layout", layout_name)
+		layout = json.loads(doc.layout)
+		changed = _insert_field_after(layout, anchor="facebook", fieldname="address")
+		if changed:
+			doc.layout = json.dumps(layout)
+			doc.save(ignore_permissions=True)
+
+
+def _insert_field_after(layout, anchor, fieldname):
+	for tab in layout:
+		for section in tab.get("sections", []):
+			for column in section.get("columns", []):
+				fields = column.get("fields", [])
+				if fieldname in fields:
+					return False
+				if anchor in fields:
+					fields.insert(fields.index(anchor) + 1, fieldname)
+					return True
+	return False
 
 
 def disable_erpnext_crm_settings_customer_sync():
