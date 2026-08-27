@@ -21,6 +21,30 @@ class TestQuoteSync(IntegrationTestCase):
 		self.assertEqual(quotation.workflow_state, "Draft")
 		self.assertEqual(quotation.party_name, deal.custom_customer)
 
+	def test_proposal_stage_links_contact_to_customer(self):
+		"""Contact/address linking used to only happen when a Sales Order is
+		created on Won -- a deal parked at Proposal got a Customer with no
+		linked Contact at all, even with a primary contact set on the deal."""
+		contact = frappe.get_doc(
+			{
+				"doctype": "Contact",
+				"first_name": "Proposal",
+				"last_name": "Contact",
+				"email_ids": [{"email_id": "proposal.contact@quote-sync-test.example", "is_primary": 1}],
+			}
+		).insert(ignore_permissions=True)
+
+		deal = create_test_deal(organization_name="Proposal Contact Org")
+		deal.append("contacts", {"contact": contact.name, "is_primary": 1})
+		deal.save()
+
+		deal.status = "Proposal"
+		deal.save()
+		deal.reload()
+
+		customer = frappe.get_doc("Customer", deal.custom_customer)
+		self.assertEqual(customer.customer_primary_contact, contact.name)
+
 	def test_quotation_finance_approval_workflow(self):
 		deal = create_test_deal(organization_name="Finance Approval Org")
 		deal.status = "Proposal"
