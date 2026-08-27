@@ -640,6 +640,16 @@ DEAL_FORM_SCRIPT = """function setupForm({ doc, updateField }) {
 		})
 	}
 
+	if (doc.custom_sales_order) {
+		actions.push({
+			label: __('View Sales Order'),
+			icon: 'file-text',
+			onClick: () => {
+				window.open('/app/sales-order/' + doc.custom_sales_order, '_blank')
+			},
+		})
+	}
+
 	// Hide the native status pill (colored dot + status label + chevron,
 	// top right) -- hardcoded in fcrm's Deal.vue, not something a Form
 	// Script action can suppress. Convert (above) is meant to be the single
